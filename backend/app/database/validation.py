@@ -94,6 +94,7 @@ COMMUNITY_ENABLED_ENDPOINTS: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/api/v1/users/me/learning-overview"),
         ("GET", "/api/v1/enrollments/{enrollment_id}"),
         ("GET", "/api/v1/enrollments/{enrollment_id}/content"),
+        ("PUT", "/api/v1/enrollments/{enrollment_id}/resources/{resource_id}/visit"),
         ("PATCH", "/api/v1/enrollments/{enrollment_id}/position"),
         ("PUT", "/api/v1/enrollments/{enrollment_id}/nodes/{node_id}/status"),
         ("POST", "/api/v1/enrollments/{enrollment_id}/abandon"),

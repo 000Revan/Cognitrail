@@ -45,3 +45,7 @@ export async function upgradeLearning(id: string, data: UpgradeRequest) {
 export async function learningSessions(id: string, page = 1) {
   return (await http.get<ApiResponse<Page<EnrollmentSummary>>>(`/api/v1/enrollments/${id}/sessions`, { params: { page } })).data.data
 }
+
+export async function visitResource(id: string, sessionId: string, resourceId: string) {
+  await http.put(`/api/v1/enrollments/${id}/resources/${resourceId}/visit`, { sessionId })
+}

@@ -7,10 +7,11 @@ import AppIcon from '../common/AppIcon.vue'
 // 只负责内容导航；身份、版本来源及后续学习操作由外层页面提供。
 const props = defineProps<{
   stages: DetailStage[]; connections: Connection[]; initialNodeId?: string; initialStageId?: string
+  visitedResourceIds?: string[]; visitError?: string
   learning?: boolean; completedNodeIds?: string[]; title?: string
   progressCompleted?: number; progressTotal?: number
 }>()
-const emit = defineEmits<{ viewNode: [id: string] }>()
+const emit = defineEmits<{ viewNode: [id: string]; visitResource: [id: string] }>()
 const selectedKind = ref<'stage' | 'node'>('node')
 const selectedId = ref('')
 const selectedStageId = ref('')
@@ -267,6 +268,7 @@ function resourceType(value: string) {
               {{ node.content || '暂未填写节点内容' }}
             </p>
             <h3>学习资源</h3>
+            <p v-if="learning && visitError" class="form-error" role="alert">{{ visitError }}</p>
             <ul
               v-if="node.resources?.length"
               class="reader-resource-cards"
@@ -274,6 +276,7 @@ function resourceType(value: string) {
               <li
                 v-for="resource in node.resources"
                 :key="resource.id"
+                :class="{ 'resource-visited': learning && visitedResourceIds?.includes(resource.id) }"
               >
                 <span class="reader-resource-type">{{ resourceType(resource.resourceType) }}</span>
                 <a
@@ -282,8 +285,11 @@ function resourceType(value: string) {
                   :aria-label="resource.title || '未命名资源'"
                   target="_blank"
                   rel="noopener noreferrer"
-                ><strong>{{ resource.title || '未命名资源' }}</strong><span aria-hidden="true">打开资源 ↗</span></a>
+                  @click="learning && emit('visitResource', resource.id)"
+                  @auxclick="learning && $event.button === 1 && emit('visitResource', resource.id)"
+                ><strong>{{ resource.title || '未命名资源' }}</strong><span aria-hidden="true">{{ learning && visitedResourceIds?.includes(resource.id) ? '再次打开 ↗' : '打开资源 ↗' }}</span></a>
                 <span v-else>{{ resource.title || '未命名资源' }}（链接未填写或不可用）</span>
+                <span v-if="learning && visitedResourceIds?.includes(resource.id)" class="resource-visited-badge" title="表示打开过链接，与节点完成独立">已访问</span>
               </li>
             </ul>
             <p

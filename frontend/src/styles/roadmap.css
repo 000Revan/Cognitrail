@@ -557,3 +557,6 @@ button:disabled { cursor:not-allowed; opacity:.55; }
  .editor-history { grid-row:4; padding:10px; gap:8px; flex-wrap:wrap; }
  .editor-page .route-actions { flex-wrap:wrap; }
 }
+
+.reader-resource-cards li.resource-visited { background:#f0f8f3; border-color:#abd1ba; }
+.resource-visited-badge { margin-left:auto; flex-shrink:0; color:#226b4f; background:#dcefe2; border-radius:5px; padding:3px 8px; font-size:12px; }

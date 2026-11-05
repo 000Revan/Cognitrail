@@ -132,3 +132,16 @@ async def records(
     page_size: Annotated[int, Query(alias="pageSize", ge=1, le=100)] = 20,
 ):
     return ApiResponse(data=await service.records(enrollment_id, current.claims, page, page_size))
+
+
+@router.put("/{enrollment_id}/resources/{resource_id}/visit")
+async def visit_resource(
+    enrollment_id: JsonId,
+    resource_id: JsonId,
+    data: SessionWrite,
+    current: CurrentUser,
+    service: Service,
+):
+    return ApiResponse(
+        data=await service.visit_resource(enrollment_id, resource_id, current.claims, data)
+    )

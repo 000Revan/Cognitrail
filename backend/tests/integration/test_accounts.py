@@ -238,7 +238,7 @@ async def accounts(tmp_path):
             assert await session.scalar(text("SELECT DATABASE()")) == settings.db_name
             state = await read_database_state(session)
             assert state["version"].split("-")[0] == "8.0.14"
-            assert state["revisions"] == ["c004_topic_privacy"]
+            assert state["revisions"] == ["c005_resource_visits"]
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),
             base_url="http://testserver",

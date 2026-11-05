@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { changeEnrollment, createStudyRecord, studyRecords, enrollmentContent, enrollmentSummary, savePosition, updateNodeStatus } from '../../api/enrollment'
 import { ApiError } from '../../api/http'
-import { dismissUpdatePrompt } from '../../api/enrollment'
+import { dismissUpdatePrompt, visitResource } from '../../api/enrollment'
 import { useAuthStore } from '../../stores/auth'
 import type { EnrollmentContent, EnrollmentSummary, StudyRecordPage } from '../../types/enrollment'
 import RoadmapContentReader from '../../components/roadmap/RoadmapContentReader.vue'
@@ -62,7 +62,29 @@ async function loadRecords(id: string, ticket = generation) {
     dateTimer = setTimeout(() => { void loadRecords(id, ticket) }, Math.min(2147483647, Math.max(1000, nextDay - Date.now() + 1000)))
   } catch (cause) { if (ticket === generation) { feedbackScope.value = 'checkin'; actionError.value = cause instanceof Error ? cause.message : '打卡状态加载失败' } }
 }
+const visitError = ref('')
+const pendingVisits = new Set<string>()
+async function resourceOpened(resourceId: string) {
+  const item = summary.value
+  if (!item?.writable) return
+  const ticket = generation
+  const key = ticket + ':' + resourceId
+  if (pendingVisits.has(key)) return
+  pendingVisits.add(key)
+  visitError.value = ''
+  try {
+    await visitResource(item.id, item.sessionId, resourceId)
+    if (ticket !== generation || !content.value) return
+    const ids = content.value.visitedResourceIds ||= []
+    if (!ids.includes(resourceId)) ids.push(resourceId)
+  } catch {
+    if (ticket === generation) visitError.value = '访问记录未保存，再次打开资源可重试。'
+  } finally {
+    pendingVisits.delete(key)
+  }
+}
 async function load() {
+  visitError.value = '' 
   const ticket = ++generation
   ++recordGeneration; ++summaryRequest
   clearTimeout(dateTimer)
@@ -304,6 +326,9 @@ onBeforeUnmount(() => { generation++; clearTimeout(dateTimer) })
         :completed-node-ids="completed"
         :progress-completed="summary.completedNodeCount"
         :progress-total="summary.progressNodeCount"
+        :visited-resource-ids="content.visitedResourceIds"
+        :visit-error="visitError"
+        @visit-resource="resourceOpened"
         @view-node="viewed"
       >
         <template #actions="{ node }">

@@ -16,6 +16,7 @@ from app.database.models.release import (
     RoadmapRelease,
 )
 from app.database.models.resource import NodeResource
+from app.database.models.resource_visit import ResourceVisit
 from app.database.models.roadmap import SkillRoadmap
 from app.database.models.stage import RoadmapStage, RoadmapStageEdge
 from app.database.models.study_record import RoadmapCheckin
@@ -41,6 +42,7 @@ __all__ = [
     "ReleaseResource",
     "ReleaseStage",
     "ReleaseStageEdge",
+    "ResourceVisit",
     "RoadmapCheckin",
     "RoadmapFavorite",
     "RoadmapIssue",

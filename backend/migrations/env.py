@@ -46,17 +46,26 @@ def migrate(connection) -> None:
         ["c002_notification_delete"],
         ["c003_official_roadmaps"],
         ["c004_topic_privacy"],
+        ["c005_resource_visits"],
     ):
         # 复用冻结基线的完整表集合校验，增量版本另外核对新增列。
+        if revisions == ["c005_resource_visits"]:
+            if "resource_visits" not in tables:
+                raise RuntimeError("缺少资源访问记录表")
+            tables = tables - {"resource_visits"}
         baseline.validate_database_state(tables, [baseline.revision])
         columns = {column["name"] for column in inspect(connection).get_columns("notifications")}
         if "deleted_at" not in columns:
             raise RuntimeError("通知删除迁移版本与实际列不一致，未执行迁移")
-        if revisions in (["c003_official_roadmaps"], ["c004_topic_privacy"]):
+        if revisions in (
+            ["c003_official_roadmaps"],
+            ["c004_topic_privacy"],
+            ["c005_resource_visits"],
+        ):
             route_columns = {c["name"] for c in inspect(connection).get_columns("skill_roadmaps")}
             if "roadmap_type" not in route_columns:
                 raise RuntimeError("官方路线迁移版本与实际列不一致，未执行迁移")
-        if revisions == ["c004_topic_privacy"]:
+        if revisions in (["c004_topic_privacy"], ["c005_resource_visits"]):
             privacy_columns = {
                 c["name"] for c in inspect(connection).get_columns("user_privacy_settings")
             }

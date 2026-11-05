@@ -82,13 +82,13 @@ def table_signature(table):
     }
 
 
-def test_all_31_models_use_one_base_and_export_actual_mapped_classes(frozen_metadata):
+def test_all_models_use_one_base_and_export_actual_mapped_classes(frozen_metadata):
     configure_mappers()
-    assert set(Base.metadata.tables) == set(VALIDATED_TABLES)
+    assert set(Base.metadata.tables) == set(VALIDATED_TABLES) | {"resource_visits"}
     assert Base.metadata is not frozen_metadata
     mapped = {mapper.local_table.name: mapper.class_ for mapper in Base.registry.mappers}
-    assert set(mapped) == set(VALIDATED_TABLES)
-    assert len(mapped) == len(models.__all__) == 31
+    assert set(mapped) == set(VALIDATED_TABLES) | {"resource_visits"}
+    assert len(mapped) == len(models.__all__) == 32
     assert all(inspect(getattr(models, name)).registry is Base.registry for name in models.__all__)
 
 

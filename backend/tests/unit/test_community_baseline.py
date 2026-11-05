@@ -22,7 +22,7 @@ from app.database.base import Base
 from app.database.validation import EXPECTED_TRIGGERS, VALIDATED_TABLES
 
 REVISION = "c001_community"
-HEAD = "c004_topic_privacy"
+HEAD = "c005_resource_visits"
 TABLES = {
     "users",
     "user_auth_sessions",
@@ -65,13 +65,13 @@ def config(output=None):
 def baseline():
     script = ScriptDirectory.from_config(config())
     assert script.get_heads() == [HEAD]
-    assert len(list(script.walk_revisions())) == 4
+    assert len(list(script.walk_revisions())) == 5
     return script.get_revision(REVISION).module
 
 
 def test_notification_delete_incremental_sql_preserves_existing_messages():
     output = StringIO()
-    command.upgrade(config(output), REVISION + ":" + HEAD, sql=True)
+    command.upgrade(config(output), REVISION + ":c004_topic_privacy", sql=True)
     sql = output.getvalue()
     assert "ALTER TABLE notifications ADD COLUMN deleted_at DATETIME(6)" in sql
     assert "CREATE TABLE" not in sql
@@ -225,7 +225,7 @@ def test_offline_sql_creates_new_schema_and_enforces_8014_rules():
     assert "CREATE TABLE study_records" not in sql
     assert "CREATE TABLE tags" not in sql
     assert "CHECK (" not in sql
-    assert sql.count("CREATE TABLE ") == 32  # 31张业务表及Alembic版本表。
+    assert sql.count("CREATE TABLE ") == 33  # 32张业务表及Alembic版本表。
     assert sql.count("CREATE TRIGGER ") == 64
     assert all(rule != "1" for rule in baseline().TRIGGER_RULES.values())
     assert "expires_at" in baseline().TRIGGER_RULES["user_auth_sessions"]
@@ -676,7 +676,7 @@ async def test_explicit_community_database_schema_is_complete():
             assert set(state["triggers"]) == EXPECTED_TRIGGERS
             connection = await session.connection()
             tables = await connection.run_sync(lambda conn: inspect(conn).get_table_names())
-            assert set(tables) == TABLES | {"alembic_version"}
+            assert set(tables) == TABLES | {"alembic_version", "resource_visits"}
             differences = await connection.run_sync(
                 lambda conn: compare_metadata(
                     MigrationContext.configure(

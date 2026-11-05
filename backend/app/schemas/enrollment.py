@@ -126,6 +126,7 @@ class EnrollmentContent(Schema):
     stages: list[LearningStage]
     connections: list[LearningConnection]
     progress: list[NodeProgress]
+    visited_resource_ids: list[str] = Field(default_factory=list)
 
 
 class StudyRecordResult(Schema):

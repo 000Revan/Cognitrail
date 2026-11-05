@@ -4,6 +4,8 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import select
+
 from app.core.exceptions import AppError
 from app.database.crud import enrollment as crud
 from app.database.crud import roadmap as roadmaps
@@ -12,6 +14,8 @@ from app.database.crud.favorite import release_counts
 from app.database.models import (
     LearningSession,
     LearningSessionEvent,
+    ReleaseResource,
+    ResourceVisit,
     RoadmapCheckin,
     RoadmapRelease,
     UserNodeProgress,
@@ -275,6 +279,7 @@ class EnrollmentService:
             )
             self.session.add(new_session)
             await self.session.flush()
+            await self.inherit_resource_visits(learning, new_session)
             for key in sorted(plan["completedKeys"]):
                 original = completed[key]
                 self.session.add(
@@ -581,11 +586,89 @@ class EnrollmentService:
                     {"source": str(e.source_stage_id), "target": str(e.target_stage_id)}
                     for e in edges
                 ],
+                "visitedResourceIds": [
+                    str(v.release_resource_id) for v in await self.resource_visits(learning.id)
+                ],
                 "progress": [
                     self.progress_data(p)
                     for p in await crud.progress_rows(self.session, learning.id)
                 ],
             }
+
+    async def resource_visits(self, session_id, *, lock=False):
+        statement = select(ResourceVisit).where(ResourceVisit.session_id == session_id)
+        return list(await self.session.scalars(crud.current_read(statement, lock)))
+
+    async def visit_resource(self, enrollment_id, resource_id, claims, data):
+        async with self.session.begin():
+            relation, route, learning, release = await self.context(
+                enrollment_id, claims, write=True
+            )
+            self.require_writable(relation, route, learning, release, data.session_id)
+            resource = await self.session.scalar(
+                select(ReleaseResource.id).where(
+                    ReleaseResource.id == resource_id, ReleaseResource.release_id == release.id
+                )
+            )
+            if resource is None:
+                raise AppError(404, "RELEASE_RESOURCE_NOT_FOUND", "资源不属于当前学习版本")
+            visit = await self.session.get(
+                ResourceVisit, (learning.id, resource_id), with_for_update=True
+            )
+            instant = now()
+            if visit is None:
+                self.session.add(
+                    ResourceVisit(
+                        session_id=learning.id,
+                        release_resource_id=resource_id,
+                        release_id=release.id,
+                        first_visited_at=instant,
+                        last_visited_at=instant,
+                    )
+                )
+            else:
+                visit.last_visited_at = max(instant, visit.last_visited_at)
+            return {"resourceId": str(resource_id)}
+
+    async def inherit_resource_visits(self, source, destination):
+        visits = {
+            v.release_resource_id: v for v in await self.resource_visits(source.id, lock=True)
+        }
+        if not visits:
+            return
+
+        def resource_key(resource, nodes):
+            return (
+                nodes[resource.node_id],
+                resource.url,
+                resource.title,
+                resource.resource_type,
+                resource.language_code,
+                resource.access_type,
+                resource.position,
+            )
+
+        _, nodes, resources, _ = await crud.release_graph(
+            self.session, source.release_id, lock=True
+        )
+        keys = {n.id: n.stable_key for n in nodes}
+        matches = {resource_key(r, keys): visits[r.id] for r in resources if r.id in visits}
+        _, nodes, resources, _ = await crud.release_graph(
+            self.session, destination.release_id, lock=True
+        )
+        keys = {n.id: n.stable_key for n in nodes}
+        for resource in resources:
+            visit = matches.get(resource_key(resource, keys))
+            if visit:
+                self.session.add(
+                    ResourceVisit(
+                        session_id=destination.id,
+                        release_resource_id=resource.id,
+                        release_id=destination.release_id,
+                        first_visited_at=visit.first_visited_at,
+                        last_visited_at=visit.last_visited_at,
+                    )
+                )
 
     async def position(self, enrollment_id, claims, data):
         """保存阅读位置，不创建进度、打卡或打开外部资源。"""

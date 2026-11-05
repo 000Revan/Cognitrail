@@ -13,6 +13,7 @@ export interface EnrollmentSummary {
 }
 export interface NodeProgress { releaseNodeId: string; completed: boolean; completedAt: string | null }
 export interface EnrollmentContent {
+  visitedResourceIds?: string[]
   enrollment: EnrollmentSummary; stages: DetailStage[]; connections: Connection[]; progress: NodeProgress[]
 }
 export interface StudyRecord {

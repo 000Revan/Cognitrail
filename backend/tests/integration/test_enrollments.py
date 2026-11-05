@@ -966,3 +966,22 @@ async def test_upgrade_private_history_and_governance_boundaries(routes):
         assert (
             await routes.client.post(endpoint + "/upgrade", headers=reader, json=payload)
         ).status_code == 409
+
+
+async def test_resource_visit_is_persistent_and_private(routes):
+    owner, _, _, reader, relation = await setup_learning(routes)
+    content = await get_content(routes, relation, reader)
+    resource = next(
+        r for stage in content["stages"] for node in stage["nodes"] for r in node["resources"]
+    )
+    endpoint = f"/api/v1/enrollments/{relation['id']}/resources/{resource['id']}/visit"
+    payload = {"sessionId": relation["sessionId"]}
+    denied = await routes.client.put(endpoint, headers=headers(owner), json=payload)
+    assert denied.status_code == 404
+    for _ in range(2):
+        result = await routes.client.put(endpoint, headers=reader, json=payload)
+        assert result.status_code == 200, result.text
+    updated = await get_content(routes, relation, reader)
+    assert updated["visitedResourceIds"] == [resource["id"]]
+    assert updated["progress"] == content["progress"]
+    assert updated["enrollment"]["progressVersion"] == content["enrollment"]["progressVersion"]

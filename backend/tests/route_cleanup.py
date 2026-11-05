@@ -19,6 +19,7 @@ from app.database.models import (
     ReleaseResource,
     ReleaseStage,
     ReleaseStageEdge,
+    ResourceVisit,
     RoadmapCheckin,
     RoadmapFavorite,
     RoadmapIssue,
@@ -136,6 +137,9 @@ async def cleanup_routes(database, usernames):
             update(LearningSession)
             .where(LearningSession.id.in_(learning_ids))
             .values(source_session_id=None)
+        )
+        await session.execute(
+            delete(ResourceVisit).where(ResourceVisit.session_id.in_(learning_ids))
         )
         await session.execute(delete(LearningSession).where(LearningSession.id.in_(learning_ids)))
         await session.execute(delete(UserRoadmap).where(UserRoadmap.id.in_(relations)))

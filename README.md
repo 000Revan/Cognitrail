@@ -107,7 +107,7 @@ uv run alembic upgrade head
 uv run alembic current
 ```
 
-当前迁移链为 `c001_community` → `c002_notification_delete` → `c003_official_roadmaps` → `c004_topic_privacy`。迁移会拒绝不兼容的旧库或不完整结构；新安装使用独立空库，不要通过 `stamp` 跳过结构校验。
+当前迁移链为 `c001_community` → `c002_notification_delete` → `c003_official_roadmaps` → `c004_topic_privacy` → `c005_resource_visits`。迁移会拒绝不兼容的旧库或不完整结构；新安装使用独立空库，不要通过 `stamp` 跳过结构校验。
 
 ### 4. 启动后端并创建管理员
 
