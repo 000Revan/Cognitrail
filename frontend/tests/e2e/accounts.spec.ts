@@ -1,0 +1,471 @@
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { randomUUID } from 'node:crypto'
+import { expect, test, type Page } from '@playwright/test'
+
+const backend = fileURLToPath(new URL('../../../backend/', import.meta.url))
+const password = 'r02-test-password-123'
+const newPassword = 'r02-new-password-456'
+const username = () => 'r02_' + randomUUID().replaceAll('-', '').slice(0, 24)
+
+async function capture(page: Page, path: string) {
+  await page.evaluate(() => {
+    if (!document.querySelector('.report-menu-panel') && document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    window.scrollTo(0, 0)
+  })
+  await page.screenshot({ path, fullPage: true, animations: 'disabled' })
+}
+
+function databaseTask(action: 'bootstrap' | 'cleanup', names: string[]) {
+  const script = `import asyncio,sys,os
+from app.config.settings import Settings
+from app.database.session import Database
+from app.config.enums import UserRole
+from app.core.security import TokenService
+from app.schemas.auth import RegisterRequest
+from app.services.auth_service import AuthService
+from app.services.avatar_service import AvatarStore
+from tests.integration.test_accounts import cleanup_accounts
+from tests.route_cleanup import cleanup_routes
+async def main():
+ settings=Settings(avatar_storage_dir=os.environ['R02_AVATAR_DIR']).for_community_tests()
+ db=Database(settings)
+ try:
+  if sys.argv[1]=='bootstrap':
+   async with db.sessions() as session:
+    await AuthService(session,TokenService(settings)).register(
+     RegisterRequest(username=sys.argv[2],password=os.environ['R02_TEST_PASSWORD'],nickname='平台管理员'),
+     role=UserRole.ADMIN)
+  else:
+   await cleanup_routes(db,set(sys.argv[2:]))
+   await cleanup_accounts(db,set(sys.argv[2:]),AvatarStore(settings))
+ finally: await db.close()
+asyncio.run(main())`
+  execFileSync('uv', ['run', 'python', '-c', script, action, ...names], {
+    cwd: backend, env: { ...process.env, PYTHONUTF8: '1', R02_TEST_PASSWORD: password, R02_AVATAR_DIR: fileURLToPath(new URL('../../../backend/.cache/e2e-avatars', import.meta.url)) }, stdio: 'pipe',
+  })
+}
+
+test('账号资料、隐私冲突、改密与当前会话退出形成真实闭环', async ({ page, request }, testInfo) => {
+  const name = username()
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    await page.goto('/settings')
+    const favicon = page.locator('link[rel="icon"]')
+    await expect(favicon).toHaveAttribute('href', '/brand-mark.png?v=20261104')
+    const iconResponse = await request.get('/brand-mark.png?v=20261104')
+    expect(iconResponse.status()).toBe(200)
+    expect(iconResponse.headers()['content-type']).toContain('image/png')
+    await expect(page).toHaveURL(/\/login$/)
+    await capture(page, testInfo.outputPath('ui-login-desktop.png'))
+    await page.getByRole('link', { name: '加入社区 →' }).click()
+    await expect(page.getByRole('button', { name: '创建账号', exact: true })).toBeVisible()
+    await capture(page, testInfo.outputPath('ui-register-desktop.png'))
+    await page.getByLabel('用户名', { exact: true }).fill(name)
+    await page.getByLabel('昵称', { exact: false }).fill('路线探索者')
+    await page.getByLabel('密码', { exact: true }).fill(password)
+    await page.getByLabel('确认密码', { exact: true }).fill(password)
+    await page.getByRole('button', { name: '创建账号', exact: true }).click()
+    await expect(page.getByRole('status')).toContainText('注册成功')
+    await page.getByLabel('密码', { exact: true }).fill(password)
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await expect(page).toHaveURL(/\/$/)
+    await page.getByRole('button', { name: '打开账号菜单', exact: true }).click()
+    await page.getByRole('menuitem', { name: '账号设置', exact: true }).click()
+    await expect(page.getByLabel('当前账号')).toContainText('路线探索者')
+    await expect(page.locator('#profile-avatar')).toHaveCount(0)
+    await expect(page.getByLabel('当前账号').locator('svg')).toBeVisible()
+    await page.getByLabel('昵称', { exact: true }).fill('未保存昵称')
+    const chooser = page.waitForEvent('filechooser')
+    await page.getByRole('button', { name: '更换头像', exact: true }).click()
+    await (await chooser).setFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAE0lEQVR4nGNkaGDACpiwCw9WCQBqCACQJ5at+QAAAABJRU5ErkJggg==', 'base64') })
+    await expect(page.getByText('头像已更新', { exact: true })).toBeVisible()
+    await expect(page.getByLabel('昵称', { exact: true })).toHaveValue('未保存昵称')
+    const avatar = page.getByLabel('当前账号').locator('img')
+    await expect(avatar).toBeVisible()
+    await expect.poll(() => avatar.evaluate(node => (node as HTMLImageElement).naturalWidth)).toBe(512)
+    await page.locator('input[type=file]').setInputFiles({ name: 'invalid.png', mimeType: 'image/png', buffer: Buffer.from('<svg/>') })
+    await expect(page.locator('.identity-panel [role="alert"]')).toContainText('请选择有效的静态')
+    await expect(avatar).toBeVisible()
+    await capture(page, testInfo.outputPath('r09-settings-profile-desktop.png'))
+    await page.getByRole('navigation', { name: '个人设置分类' }).getByRole('link', { name: '隐私设置' }).click()
+    await expect(page.locator('#profile-nickname')).toHaveCount(0)
+    const privacy = page.getByRole('form', { name: '隐私设置' })
+    await expect(privacy.getByLabel('发布路线动态', { exact: true })).toBeChecked()
+    for (const label of ['打卡动态', '收藏列表', '学习列表']) {
+      await expect(privacy.getByLabel(label, { exact: true })).not.toBeChecked()
+    }
+    await privacy.getByLabel('打卡动态', { exact: true }).check()
+    await privacy.getByRole('button', { name: '保存隐私设置', exact: true }).click()
+    await expect(page.getByText('隐私设置已保存。', { exact: true })).toBeVisible()
+
+    const logged = await request.post('/api/v1/auth/login', { data: { username: name, password } })
+    expect(logged.status()).toBe(200)
+    const token = (await logged.json()).data.accessToken
+    const authorization = { Authorization: 'Bearer ' + token }
+    const current = (await (await request.get('/api/v1/users/me/privacy', { headers: authorization })).json()).data
+    expect((await request.patch('/api/v1/users/me/privacy', { headers: authorization,
+      data: { ...current, learningPublic: true } })).status()).toBe(200)
+    await privacy.getByLabel('收藏列表', { exact: true }).check()
+    await privacy.getByRole('button', { name: '保存隐私设置', exact: true }).click()
+    await expect(page.getByText('设置已被其他页面修改，已重新加载，请检查后再保存。', { exact: true })).toBeVisible()
+    await expect(privacy.getByLabel('学习列表', { exact: true })).toBeChecked()
+    await expect(privacy.getByLabel('收藏列表', { exact: true })).not.toBeChecked()
+    await expect(page.locator('.el-message:not(.el-message-fade-leave-active)')).toHaveCount(0)
+
+    await capture(page, testInfo.outputPath('r09-settings-privacy-desktop.png'))
+    await page.getByRole('navigation', { name: '个人设置分类' }).getByRole('link', { name: '个人资料' }).click()
+    await page.getByLabel('昵称', { exact: true }).fill('路线分享者')
+    await page.getByLabel('个人简介', { exact: true }).fill('在这里分享学习经验。')
+    await page.getByRole('button', { name: '保存资料', exact: true }).click()
+    await expect(page.getByText('个人资料已保存。', { exact: true })).toBeVisible()
+    await expect(page.locator('.el-message').filter({ hasText: '个人资料已保存。' })).toBeVisible()
+    await expect(page.locator('.el-message:not(.el-message-fade-leave-active)')).toHaveCount(1)
+    await expect(page.getByText('个人资料已保存。', { exact: true })).toHaveCount(0, { timeout: 6000 })
+    await expect(page.getByLabel('当前账号')).toContainText('路线分享者')
+    await capture(page, testInfo.outputPath('r02-settings-desktop.png'))
+    await page.setViewportSize({ width: 390, height: 844 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await capture(page, testInfo.outputPath('r02-settings-mobile.png'))
+
+    await page.getByRole('navigation', { name: '个人设置分类' }).getByRole('link', { name: '修改密码' }).click()
+    await capture(page, testInfo.outputPath('r09-settings-password-mobile.png'))
+    await page.getByLabel('原密码', { exact: true }).fill(password)
+    await page.getByLabel('新密码', { exact: true }).fill(newPassword)
+    await page.getByLabel('确认新密码', { exact: true }).fill(newPassword)
+    await page.getByRole('button', { name: '修改密码并重新登录', exact: true }).click()
+    await expect(page).toHaveURL(/\/login/)
+    await expect(page.getByRole('status')).toContainText('密码已修改')
+    expect((await request.get('/api/v1/users/me', { headers: authorization })).status()).toBe(401)
+    await page.getByLabel('密码', { exact: true }).fill(newPassword)
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await expect(page).toHaveURL(/\/$/)
+
+    await page.getByRole('button', { name: '打开账号菜单', exact: true }).click()
+    await page.getByRole('menuitem', { name: '账号设置', exact: true }).click()
+    await expect(page.getByLabel('昵称', { exact: true })).toHaveValue('路线分享者')
+    await page.reload()
+    await expect(page).toHaveURL(/\/login$/)
+    await page.getByLabel('用户名', { exact: true }).fill(name)
+    await page.getByLabel('密码', { exact: true }).fill(newPassword)
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await expect(page).toHaveURL(/\/$/)
+    await page.getByRole('button', { name: '打开账号菜单', exact: true }).click()
+    await page.getByRole('menuitem', { name: '账号设置', exact: true }).click()
+    await expect(page.getByLabel('昵称', { exact: true })).toHaveValue('路线分享者')
+    await expect(page.getByLabel('当前账号').locator('img')).toBeVisible()
+    await page.getByRole('navigation', { name: '个人设置分类' }).getByRole('link', { name: '隐私设置' }).click()
+    await expect(page.getByRole('form', { name: '隐私设置' }).getByLabel('学习列表', { exact: true })).toBeChecked()
+
+    const other = await request.post('/api/v1/auth/login', { data: { username: name, password: newPassword } })
+    expect(other.status()).toBe(200)
+    const otherToken = (await other.json()).data.accessToken
+    await page.getByRole('button', { name: '打开账号菜单', exact: true }).click()
+    await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
+    await expect(page).toHaveURL(/\/login/)
+    expect((await request.get('/api/v1/users/me', { headers: { Authorization: 'Bearer ' + otherToken } })).status()).toBe(200)
+    expect(await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length }))).toEqual({ local: 0, session: 0 })
+    expect(errors).toEqual([])
+  } finally { databaseTask('cleanup', [name]) }
+})
+
+test('R08独立后台、覆盖侧栏、路线审核下架恢复及官方维护', async ({ page, request }, testInfo) => {
+  test.setTimeout(120000)
+  const adminName = username(), authorName = username(), readerName = username()
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  try {
+    databaseTask('bootstrap', [adminName])
+    expect((await request.post('/api/v1/auth/register', { data: { username: authorName, password, nickname: '路线作者' } })).status()).toBe(201)
+    const owner = (await (await request.post('/api/v1/auth/login', { data: { username: authorName, password } })).json()).data.accessToken
+    const ownerHeaders = { Authorization: 'Bearer ' + owner }
+    const created = await request.post('/api/v1/roadmaps', { headers: ownerHeaders, data: { title: '后台审核示例' } })
+    const rid = (await created.json()).data.id
+    const saved = await request.put(`/api/v1/roadmaps/${rid}/draft`, { headers: ownerHeaders, data: {
+      expectedVersion: 1, title: '后台审核示例', description: '面向初学者的 Python 入门路径，从基础概念到小型实践。', difficulty: 'beginner', licenseCode: 'CC-BY-4.0',
+      stages: [{ id: 'tmp_stage', title: '基础入门', nodes: [{ id: 'tmp_node', title: '变量与类型', content: '审核专用正文：从理解变量开始。', resources: [{ id: 'tmp_resource', title: 'Python 官方教程', resourceType: 'article', resourceUrl: 'https://docs.python.org/3/tutorial/' }] }] }], connections: [],
+    } })
+    expect(saved.status()).toBe(200)
+    const doc = (await saved.json()).data.document
+    expect((await request.post(`/api/v1/roadmaps/${rid}/publish`, { headers: ownerHeaders, data: { expectedVersion: doc.expectedVersion, updateSummary: '发布入门学习路径' } })).status()).toBe(200)
+    expect((await request.post('/api/v1/auth/register', { data: { username: readerName, password, nickname: '学习者' } })).status()).toBe(201)
+    const readerToken = (await (await request.post('/api/v1/auth/login', { data: { username: readerName, password } })).json()).data.accessToken
+    const readerHeaders = { Authorization: 'Bearer ' + readerToken }
+    const routeSummary = (await (await request.get(`/api/v1/roadmaps/${rid}`, { headers: readerHeaders })).json()).data
+    const relation = (await (await request.post(`/api/v1/roadmaps/${rid}/enroll`, { headers: readerHeaders, data: { releaseId: routeSummary.releaseId } })).json()).data
+    const record = (await (await request.post(`/api/v1/enrollments/${relation.id}/records`, { headers: readerHeaders, data: { sessionId: relation.sessionId } })).json()).data
+    const topic = (await (await request.post(`/api/v1/roadmaps/${rid}/issues`, { headers: ownerHeaders, data: { title: '资源内容核对', body: '讨论资源的适用性' } })).json()).data
+    const topicUrl = `/api/v1/roadmaps/${rid}/issues/${topic.id}`
+    expect((await request.post(topicUrl + '/comments', { headers: ownerHeaders, data: { body: '需要审核的广告回复' } })).status()).toBe(201)
+    await page.setViewportSize({ width: 1600, height: 1000 })
+    await page.goto(`/roadmaps/${rid}/issues/${topic.id}`)
+    await page.getByLabel('用户名', { exact: true }).fill(readerName)
+    await page.getByLabel('密码', { exact: true }).fill(password)
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await expect(page).toHaveURL(/\/$/)
+    await page.evaluate(target => {
+      history.pushState(null, '', target)
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    }, '/roadmaps/' + rid + '/issues/' + topic.id)
+    await expect(page).toHaveURL(new RegExp(`/roadmaps/${rid}/issues/${topic.id}$`))
+    await page.getByRole('button', { name: '话题更多操作', exact: true }).click()
+    await capture(page, testInfo.outputPath('r08-topic-report-menu-desktop.png'))
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await page.getByRole('button', { name: '话题更多操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: '举报话题', exact: true }).click()
+    await expect(page.getByRole('dialog', { name: '举报话题', exact: true })).toBeVisible()
+    await expect(page.getByRole('dialog').getByText('资源内容核对', { exact: true })).toBeVisible()
+    await page.getByRole('radio', { name: '侵权内容', exact: true }).check()
+    await capture(page, testInfo.outputPath('r08-topic-report-dialog-desktop.png'))
+    await page.getByRole('button', { name: '取消', exact: true }).click()
+    await page.locator('.discussion-breadcrumb a').first().click()
+    await page.getByRole('button', { name: '路线更多操作', exact: true }).click()
+    await capture(page, testInfo.outputPath('r08-route-report-menu-desktop.png'))
+    await page.getByRole('menuitem', { name: '举报路线', exact: true }).click()
+    const reportDialog = page.getByRole('dialog', { name: '举报路线', exact: true })
+    await expect(reportDialog).toBeVisible()
+    await expect(reportDialog.getByRole('button', { name: '提交举报', exact: true })).toBeDisabled()
+    expect((await reportDialog.boundingBox())!.width).toBeLessThanOrEqual(560)
+    await capture(page, testInfo.outputPath('r08-route-report-dialog-desktop.png'))
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.getByRole('radio', { name: '其他问题', exact: true }).check()
+    await page.getByLabel('补充说明（选填）', { exact: true }).fill('检查路线举报表单的完整布局')
+    await capture(page, testInfo.outputPath('r08-route-report-dialog-mobile.png'))
+    const dialogBounds = (await reportDialog.boundingBox())!
+    const textareaBounds = (await reportDialog.locator('textarea').boundingBox())!
+    expect(textareaBounds.width).toBeGreaterThan(280)
+    expect(dialogBounds.x).toBeGreaterThanOrEqual(0)
+    expect(dialogBounds.x + dialogBounds.width).toBeLessThanOrEqual(390)
+    await expect(reportDialog.getByRole('button', { name: '提交举报', exact: true })).toBeInViewport()
+    await page.setViewportSize({ width: 375, height: 812 })
+    expect((await reportDialog.boundingBox())!.width).toBeLessThanOrEqual(351)
+    await page.getByRole('button', { name: '取消', exact: true }).click()
+    expect((await (await request.get('/api/v1/reports', { headers: readerHeaders })).json()).data.total).toBe(0)
+    await page.getByRole('button', { name: '路线更多操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: '举报路线', exact: true }).click()
+    await page.getByRole('radio', { name: '其他问题', exact: true }).check()
+    await page.getByLabel('补充说明（选填）', { exact: true }).fill('路线举报：核对资源适用性')
+    const routeReportResponse = page.waitForResponse(r => r.url().endsWith('/api/v1/reports') && r.request().method() === 'POST')
+    await page.getByRole('button', { name: '提交举报', exact: true }).click()
+    const routeReport = await routeReportResponse
+    expect(routeReport.status()).toBe(201)
+    const routeReportData = (await routeReport.json()).data
+    expect(routeReportData.targetType).toBe('roadmap')
+    expect(routeReportData.targetId).toBe(rid)
+    await expect(page.getByText('举报已提交，我们会按内容规范处理。')).toBeVisible()
+    await page.getByRole('button', { name: '完成', exact: true }).click()
+    await page.setViewportSize({ width: 1600, height: 1000 })
+    await page.getByRole('link', { name: '问题与反馈', exact: true }).click()
+    await page.getByRole('link', { name: '资源内容核对', exact: true }).click()
+    for (const viewport of [{ width: 1600, height: 1000 }, { width: 390, height: 540 }]) {
+      await page.setViewportSize(viewport)
+      const trigger = page.getByRole('button', { name: '回复更多操作', exact: true })
+      await trigger.scrollIntoViewIfNeeded()
+      if (viewport.width === 390) await trigger.evaluate(element => {
+        window.scrollBy(0, element.getBoundingClientRect().bottom - (window.innerHeight - 8))
+      })
+      await trigger.click()
+      const menu = page.getByRole('menu', { name: '回复操作', exact: true })
+      const item = menu.getByRole('menuitem', { name: '举报回复', exact: true })
+      await expect(item).toBeInViewport()
+      await expect.poll(async () => {
+        const bounds = (await menu.boundingBox())!
+        return bounds.x >= 8 && bounds.x + bounds.width <= viewport.width - 8
+      }).toBe(true)
+      // 验证整个选项底部实际可点击，单看DOM可见性不能发现overflow裁剪。
+      await expect.poll(() => item.evaluate(element => {
+        const bounds = element.getBoundingClientRect()
+        return element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.bottom - 3))
+      })).toBe(true)
+      if (viewport.width === 390) await expect(menu).toHaveClass(/opens-up/)
+      await page.screenshot({ path: testInfo.outputPath(viewport.width === 390 ? 'r08-reply-menu-mobile-unclipped.png' : 'r08-reply-menu-desktop-unclipped.png'), animations: 'disabled' })
+      await page.keyboard.press('Escape')
+      await expect(menu).toHaveCount(0)
+    }
+    await page.setViewportSize({ width: 1600, height: 1000 })
+    await page.getByRole('button', { name: '回复更多操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: '举报回复', exact: true }).click()
+    await page.getByRole('radio', { name: '垃圾广告', exact: true }).check()
+    await page.getByLabel('补充说明（选填）', { exact: true }).fill('这条回复包含无关广告')
+    const reportResponse = page.waitForResponse(r => r.url().endsWith('/api/v1/reports') && r.request().method() === 'POST')
+    await page.getByRole('button', { name: '提交举报', exact: true }).click()
+    expect((await reportResponse).status()).toBe(201)
+    await expect(page.getByText('举报已提交，我们会按内容规范处理。')).toBeVisible()
+    await page.getByRole('button', { name: '完成', exact: true }).click()
+    await page.getByLabel('打开账号菜单', { exact: true }).click()
+    await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
+    await expect(page).toHaveURL(/\/login$/)
+    await page.getByLabel('用户名', { exact: true }).fill(adminName)
+    await page.getByLabel('密码', { exact: true }).fill(password)
+    const logged = page.waitForResponse(r => r.url().endsWith('/api/v1/auth/login') && r.status() === 200)
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    const admin = (await (await logged).json()).data.accessToken
+    const adminHeaders = { Authorization: 'Bearer ' + admin }
+    await expect(page).toHaveURL(/\/admin\/roadmaps$/)
+    await expect(page.getByRole('heading', { name: '社区路线管理', exact: true })).toBeVisible()
+    for (const title of ['社区发现', '我的收藏', '我的学习']) await expect(page.getByRole('link', { name: title, exact: true })).toHaveCount(0)
+    expect((await request.get('/api/v1/roadmaps?preview=draft', { headers: adminHeaders })).status()).toBe(403)
+    const before = await page.locator('#admin-content').boundingBox()
+    await page.getByLabel('展开管理侧栏').click()
+    await expect(page.getByRole('dialog', { name: '管理导航' })).toBeVisible()
+    expect(await page.locator('#admin-content').boundingBox()).toEqual(before)
+    await capture(page, testInfo.outputPath('r08-admin-drawer.png'))
+    await page.keyboard.press('Escape')
+    await expect(page.locator('#admin-drawer')).toHaveCount(0)
+    await page.getByLabel('搜索路线标题').fill('后台审核示例')
+    await page.getByRole('button', { name: '搜索', exact: true }).click()
+    await expect(page.locator('tbody tr')).toHaveCount(1)
+    await capture(page, testInfo.outputPath('r08-admin-list-desktop.png'))
+    await page.getByLabel('难度', { exact: true }).selectOption('advanced')
+    await expect(page.getByText('没有符合条件的路线')).toBeVisible()
+    await page.getByLabel('难度', { exact: true }).selectOption('beginner')
+    await page.getByRole('link', { name: '审核详情' }).click()
+    await expect(page.getByText('审核专用正文：从理解变量开始。', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '收藏', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '开始学习', exact: true })).toHaveCount(0)
+    await capture(page, testInfo.outputPath('r08-admin-review-desktop.png'))
+    await page.getByRole('button', { name: '下架路线', exact: true }).click()
+    await page.getByRole('button', { name: '取消', exact: true }).click()
+    expect((await request.get(`/api/v1/roadmaps/${rid}`)).status()).toBe(200)
+    await page.getByRole('button', { name: '下架路线', exact: true }).click()
+    await page.getByLabel('下架原因', { exact: true }).fill('测试：需要补充内容依据')
+    await page.getByRole('button', { name: '确认下架', exact: true }).click()
+    await expect(page.getByRole('button', { name: '恢复路线', exact: true })).toBeVisible()
+    expect((await request.get(`/api/v1/roadmaps/${rid}`)).status()).toBe(404)
+    await page.getByRole('button', { name: '恢复路线', exact: true }).click()
+    await page.getByLabel('恢复原因', { exact: true }).fill('测试：复核通过')
+    await page.getByRole('button', { name: '确认恢复', exact: true }).click()
+    await expect(page.getByRole('button', { name: '下架路线', exact: true })).toBeVisible()
+    expect((await request.get(`/api/v1/roadmaps/${rid}`)).status()).toBe(200)
+    await page.setViewportSize({ width: 390, height: 844 })
+    const readerBounds = await page.locator('.admin-review .content-reader-main').boundingBox()
+    const directoryBounds = await page.locator('.admin-review .content-reader-directory').boundingBox()
+    expect(readerBounds!.width).toBeGreaterThan(250)
+    expect(readerBounds!.y).toBeGreaterThanOrEqual(directoryBounds!.y + directoryBounds!.height)
+    await capture(page, testInfo.outputPath('r08-admin-review-mobile.png'))
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.setViewportSize({ width: 375, height: 812 })
+    expect((await page.locator('.admin-review .content-reader-main').boundingBox())!.width).toBeGreaterThan(250)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.setViewportSize({ width: 844, height: 390 })
+    await page.getByRole('link', { name: '系统设置', exact: true }).scrollIntoViewIfNeeded()
+    await expect(page.getByRole('link', { name: '系统设置', exact: true })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.getByRole('navigation', { name: '面包屑' }).getByRole('link', { name: '社区路线管理' }).click()
+    await page.getByLabel('搜索路线标题').fill('后台审核示例')
+    await page.getByRole('button', { name: '搜索', exact: true }).click()
+    await expect(page.locator('tbody tr')).toHaveCount(1)
+    await capture(page, testInfo.outputPath('r08-admin-list-mobile.png'))
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.getByRole('link', { name: '官方路线管理', exact: true }).click()
+    await page.getByRole('button', { name: '＋ 新建官方路线', exact: true }).click()
+    await page.getByRole('dialog').getByRole('textbox').fill('官方学习路线')
+    await page.getByRole('dialog').getByRole('button', { name: '创建并编辑', exact: true }).click()
+    await expect(page.getByLabel('路线标题', { exact: true })).toHaveValue('官方学习路线')
+    await page.getByRole('link', { name: '路线仓库', exact: true }).click()
+    await expect(page.getByText('官方学习路线', { exact: true })).toBeVisible()
+    await page.getByRole('link', { name: '系统设置', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '系统设置', exact: true })).toBeVisible()
+    await expect(page.getByText('Asia/Shanghai', { exact: true })).toBeVisible()
+    await page.getByLabel('打卡编号', { exact: true }).fill(record.id)
+    await page.getByLabel('撤销原因', { exact: true }).fill('测试：核实为无效打卡')
+    await page.getByRole('button', { name: '撤销无效打卡', exact: true }).click()
+    await page.getByRole('button', { name: '取消', exact: true }).click()
+    await page.getByRole('button', { name: '撤销无效打卡', exact: true }).click()
+    await page.getByRole('button', { name: '确认撤销', exact: true }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    const after = (await (await request.get('/api/v1/users/me/learning-overview', { headers: readerHeaders })).json()).data
+    expect(after.checkinDayCount).toBe(0)
+    await page.getByRole('link', { name: '举报处理', exact: true }).click()
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    await expect(page.locator('.report-row')).toHaveCount(2)
+    await capture(page, testInfo.outputPath('r08-reports-queue-desktop.png'))
+    await page.locator('.report-row').filter({ hasText: '这条回复包含无关广告' }).getByRole('button', { name: '查看并处理', exact: true }).click()
+    const review = page.getByRole('dialog', { name: '举报审核', exact: true })
+    await expect(review.getByText('需要审核的广告回复', { exact: true })).toBeVisible()
+    await expect(review.locator('.target-visibility')).toHaveText('正常展示')
+    await expect(review.getByRole('button', { name: '确认处理', exact: true })).toBeDisabled()
+    const desktopFields = await review.locator('#report-choice, #report-result').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().width))
+    expect(desktopFields.every(width => width > 300)).toBe(true)
+    await capture(page, testInfo.outputPath('r08-report-review-desktop.png'))
+    await page.setViewportSize({ width: 375, height: 812 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await expect(review.getByRole('button', { name: '确认处理', exact: true })).toBeInViewport()
+    await capture(page, testInfo.outputPath('r08-report-review-mobile.png'))
+    await page.getByLabel('处理结果', { exact: true }).selectOption('resolved')
+    await page.getByLabel('内容操作', { exact: true }).selectOption('hide')
+    await page.getByLabel('处理依据与说明', { exact: true }).fill('测试：确认无关广告，隐藏回复')
+    await capture(page, testInfo.outputPath('r08-report-review-form-mobile.png'))
+    await page.getByRole('button', { name: '确认处理', exact: true }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.locator('.report-row [data-status="resolved"]')).toBeVisible()
+    await expect(page.getByRole('status')).toContainText('处理结果已保存')
+    await capture(page, testInfo.outputPath('r08-reports-mobile.png'))
+    const moderated = (await (await request.get(topicUrl, { headers: readerHeaders })).json()).data
+    expect(JSON.stringify(moderated)).not.toContain('需要审核的广告回复')
+    expect(moderated.comments.items[0].visibility).toBe('hidden')
+    const mine = (await (await request.get('/api/v1/reports', { headers: readerHeaders })).json()).data
+    expect(mine.items[0].status).toBe('resolved')
+    await capture(page, testInfo.outputPath('r08-reports-mobile.png'))
+    await page.getByRole('link', { name: '系统设置', exact: true }).click()
+    await page.getByRole('link', { name: '查看操作审计', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '操作审计', exact: true })).toBeVisible()
+    await expect(page.getByText('report.resolved', { exact: true })).toBeVisible()
+    await page.reload()
+    await expect(page).toHaveURL(/\/login$/)
+    await page.getByLabel('用户名', { exact: true }).fill(readerName)
+    await page.getByLabel('密码', { exact: true }).fill(password)
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await expect(page).toHaveURL(/\/$/)
+    expect(errors).toEqual([])
+  } finally { databaseTask('cleanup', [adminName, authorName, readerName]) }
+})
+
+test('管理员使用独立后台完成账号创建、停用恢复和重置密码', async ({ page, request }, testInfo) => {
+  const adminName = username()
+  const managedName = username()
+  databaseTask('bootstrap', [adminName])
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    await page.goto('/admin/users')
+    await page.getByLabel('用户名', { exact: true }).fill(adminName)
+    await page.getByLabel('密码', { exact: true }).fill(password)
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '社区路线管理', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: '社区发现', exact: true })).toHaveCount(0)
+    await page.getByRole('link', { name: '账户管理', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '账号管理', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '＋ 创建账号', exact: true }).click()
+    await page.getByLabel('用户名', { exact: true }).fill(managedName)
+    await page.getByLabel('初始密码', { exact: true }).fill(password)
+    await page.getByLabel('确认密码', { exact: true }).fill(password)
+    await page.getByRole('button', { name: '创建账号', exact: true }).click()
+    await expect(page.getByText('账号已创建，可以使用初始密码登录。', { exact: true })).toBeVisible()
+    await page.getByLabel('用户名或昵称', { exact: true }).fill(managedName)
+    await page.getByRole('button', { name: '搜索', exact: true }).click()
+    const row = page.locator('tbody tr').filter({ hasText: managedName })
+    await expect(row).toHaveCount(1)
+    const logged = await request.post('/api/v1/auth/login', { data: { username: managedName, password } })
+    expect(logged.status()).toBe(200)
+    const token = (await logged.json()).data.accessToken
+    await row.getByRole('button', { name: '禁用账号', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: '确认', exact: true }).click()
+    await expect(page.getByText('账号已禁用，旧登录凭证已失效。', { exact: true })).toBeVisible()
+    expect((await request.get('/api/v1/users/me', { headers: { Authorization: 'Bearer ' + token } })).status()).toBe(401)
+    await row.getByRole('button', { name: '启用账号', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: '确认', exact: true }).click()
+    await expect(page.getByText('账号已启用，用户可重新登录。', { exact: true })).toBeVisible()
+    await row.getByRole('button', { name: '重置密码', exact: true }).click()
+    await page.getByLabel('新密码', { exact: true }).fill(newPassword)
+    await page.getByLabel('确认密码', { exact: true }).fill(newPassword)
+    await page.getByRole('button', { name: '确认重置密码', exact: true }).click()
+    await expect(page.getByText('密码已重置，旧登录凭证已失效；账号状态保持。', { exact: true })).toBeVisible()
+    expect((await request.post('/api/v1/auth/login', { data: { username: managedName, password: newPassword } })).status()).toBe(200)
+    await capture(page, testInfo.outputPath('r02-admin-desktop.png'))
+  } finally { databaseTask('cleanup', [adminName, managedName]) }
+})

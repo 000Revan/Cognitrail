@@ -1,0 +1,41 @@
+[project]
+name = "cognitrail-backend"
+version = "0.1.0"
+description = "知途工坊 API"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "pydantic>=2.10,<3",
+    "pydantic-settings>=2.7,<3",
+    "sqlalchemy[asyncio]>=2.0.36,<2.1",
+    "asyncmy>=0.2.10,<0.3",
+    "alembic>=1.14,<2",
+    "uvicorn>=0.34,<1",
+    "tzdata>=2025.1",
+    "pyjwt>=2.10,<3",
+    "pwdlib[argon2]>=0.2,<1",
+    "pillow>=12.3,<14",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<10",
+    "pytest-asyncio>=0.25,<2",
+    "httpx>=0.28,<1",
+    "ruff>=0.11,<1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["database: 需要真实 MySQL，设置 RUN_DB_TESTS=1 后运行"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+

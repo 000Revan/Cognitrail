@@ -1,0 +1,157 @@
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import * as api from '../../src/api/moderation'
+import ReportDialog from '../../src/components/common/ReportDialog.vue'
+import ReportsView from '../../src/views/ReportsView.vue'
+import { useAuthStore } from '../../src/stores/auth'
+vi.mock('../../src/api/moderation', () => ({ submitReport: vi.fn(), reportList: vi.fn(), reportDetail: vi.fn(), handleReport: vi.fn() }))
+const report: api.Report = { id: '4', targetType: 'comment', targetId: '12', reasonCode: 'spam', description: '广告', status: 'pending', resultNote: null, createdAt: '2026-11-03T00:00:00Z', handledAt: null, target: { roadmapId: '8', title: '回复', body: '待审核内容', visibility: 'public' } }
+beforeEach(() => {
+  setActivePinia(createPinia()); vi.resetAllMocks()
+  Object.assign(HTMLDialogElement.prototype, { showModal(this: HTMLDialogElement) { this.open = true }, close(this: HTMLDialogElement) { this.open = false } })
+  vi.mocked(api.reportList).mockResolvedValue({ items: [report], total: 1, page: 1, pageSize: 20 })
+  vi.mocked(api.reportDetail).mockResolvedValue(report)
+})
+async function context(admin: boolean) {
+  const router = createRouter({ history: createMemoryHistory(), routes: [
+    { path: '/reports', name: 'reports', component: ReportsView },
+    { path: '/admin/reports', name: 'admin-reports', component: ReportsView },
+    { path: '/admin/roadmaps/8', component: { template: '<p />' } },
+  ] })
+  await router.push(admin ? '/admin/reports' : '/reports')
+  return router
+}
+it('举报取消不发送，失败保留说明，成功显示受理提示', async () => {
+  const router = await context(false)
+  let wrapper = mount(ReportDialog, { props: { targetType: 'comment', targetId: '12' }, global: { plugins: [router] } })
+  await wrapper.get('footer button').trigger('click')
+  expect(api.submitReport).not.toHaveBeenCalled()
+  wrapper.unmount()
+  wrapper = mount(ReportDialog, { props: { targetType: 'comment', targetId: '12' }, global: { plugins: [router] } })
+  expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+  await wrapper.get('input[value="spam"]').setValue(true)
+  await wrapper.get('textarea').setValue('需要核对')
+  vi.mocked(api.submitReport).mockRejectedValueOnce(new Error('提交失败'))
+  await wrapper.get('form').trigger('submit'); await flushPromises()
+  expect(wrapper.get('[role="alert"]').text()).toBe('提交失败')
+  expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('需要核对')
+  vi.mocked(api.submitReport).mockResolvedValueOnce(report)
+  await wrapper.get('form').trigger('submit'); await flushPromises()
+  expect(wrapper.get('[role="status"]').text()).toContain('举报已提交')
+  wrapper.unmount()
+})
+it('更多菜单支持键盘关闭，选择举报后展示正确对象且无默认原因', async () => {
+  const router = await context(false)
+  const wrapper = mount(ReportDialog, { props: { targetType: 'issue', targetId: '12', targetTitle: '路线资源反馈', withTrigger: true }, global: { plugins: [router] } })
+  expect(wrapper.find('dialog').exists()).toBe(false)
+  await wrapper.get('[aria-haspopup="menu"]').trigger('keydown', { key: 'ArrowDown' }); await flushPromises()
+  expect(wrapper.get('[role="menuitem"]').text()).toBe('举报话题')
+  await wrapper.get('[role="menu"]').trigger('keydown', { key: 'Escape' })
+  expect(wrapper.find('[role="menu"]').exists()).toBe(false)
+  await wrapper.get('[aria-haspopup="menu"]').trigger('click')
+  await wrapper.get('[role="menuitem"]').trigger('click'); await flushPromises()
+  expect(wrapper.get('dialog').attributes('aria-label')).toBe('举报话题')
+  expect(wrapper.get('.report-target-context').text()).toContain('路线资源反馈')
+  expect(wrapper.findAll('input:checked')).toHaveLength(0)
+  expect(wrapper.findAll('input[type="radio"]')).toHaveLength(5)
+  await wrapper.get('form').trigger('submit'); await flushPromises()
+  expect(api.submitReport).not.toHaveBeenCalled()
+  expect(wrapper.get('[role="alert"]').text()).toBe('请选择举报原因')
+  wrapper.unmount()
+})
+it('多个举报入口使用不同表单ID，关闭重开清空选择与说明', async () => {
+  const router = await context(false)
+  const parent = mount({ components: { ReportDialog }, template: '<div><ReportDialog target-type="comment" target-id="12" with-trigger /><ReportDialog target-type="comment" target-id="13" with-trigger /></div>' }, { global: { plugins: [router] } })
+  const [first, second] = parent.findAllComponents(ReportDialog)
+  if (!first || !second) throw new Error('举报入口未挂载')
+  for (const wrapper of [first, second]) { await wrapper.get('[aria-haspopup="menu"]').trigger('click'); await wrapper.get('[role="menuitem"]').trigger('click') }
+  expect(first.get('form').attributes('id')).not.toBe(second.get('form').attributes('id'))
+  await first.get('input[value="spam"]').setValue(true); await first.get('textarea').setValue('未提交的内容')
+  await first.get('footer button').trigger('click')
+  await first.get('[aria-haspopup="menu"]').trigger('click'); await first.get('[role="menuitem"]').trigger('click')
+  expect((first.get('textarea').element as HTMLTextAreaElement).value).toBe('')
+  expect(first.findAll('input:checked')).toHaveLength(0)
+  parent.unmount()
+})
+it('接近视口底部向上展开，窗口空间变化后重新定位', async () => {
+  const router = await context(false)
+  const wrapper = mount(ReportDialog, { props: { targetType: 'comment', targetId: '12', withTrigger: true }, global: { plugins: [router] } })
+  const trigger = wrapper.get('[aria-haspopup="menu"]').element
+  const bounds = vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(new DOMRect(200, window.innerHeight - 36, 32, 32))
+  await wrapper.get('[aria-haspopup="menu"]').trigger('click'); await flushPromises()
+  expect(wrapper.get('[role="menu"]').classes()).toContain('opens-up')
+  bounds.mockReturnValue(new DOMRect(200, 20, 32, 32))
+  window.dispatchEvent(new Event('resize')); await flushPromises()
+  expect(wrapper.get('[role="menu"]').classes()).not.toContain('opens-up')
+  wrapper.unmount(); bounds.mockRestore()
+})
+it('普通用户只能加载本人举报，页面没有管理操作', async () => {
+  const router = await context(false)
+  const wrapper = mount(ReportsView, { global: { plugins: [router] } }); await flushPromises()
+  expect(api.reportList).toHaveBeenCalledWith(false, '', 1)
+  expect(wrapper.text()).toContain('我的举报')
+  expect(wrapper.text()).not.toContain('查看并处理')
+  wrapper.unmount()
+})
+it('管理结案携带预期状态，失败不关闭或丢失依据', async () => {
+  const router = await context(true)
+  const wrapper = mount(ReportsView, { global: { plugins: [router] } }); await flushPromises()
+  await wrapper.get('.report-row-foot button').trigger('click'); await flushPromises()
+  await wrapper.get('#report-choice').setValue('resolved')
+  await wrapper.get('#report-action').setValue('hide')
+  await wrapper.get('textarea').setValue('确认广告')
+  vi.mocked(api.handleReport).mockRejectedValueOnce(new Error('状态已变化'))
+  await wrapper.get('form').trigger('submit'); await flushPromises()
+  expect(api.handleReport).toHaveBeenCalledWith('4', { expectedStatus: 'pending', status: 'resolved', action: 'hide', reason: '确认广告' })
+  expect(wrapper.get('[role="alert"]').text()).toContain('状态已变化')
+  expect(wrapper.find('dialog').exists()).toBe(true)
+  wrapper.unmount()
+})
+it('切换账号会清除打开的举报内容，旧详情响应不能重新打开', async () => {
+  let finish!: (value: api.Report) => void
+  vi.mocked(api.reportDetail).mockReturnValueOnce(new Promise(done => { finish = done }))
+  const router = await context(true)
+  const wrapper = mount(ReportsView, { global: { plugins: [router] } }); await flushPromises()
+  await wrapper.get('.report-row-foot button').trigger('click')
+  useAuthStore().clear(); await flushPromises()
+  finish(report); await flushPromises()
+  expect(wrapper.find('dialog').exists()).toBe(false)
+  wrapper.unmount()
+})
+
+it('审核说明必填且非结案不执行隐藏，成功显示反馈并刷新', async () => {
+  const router = await context(true)
+  const wrapper = mount(ReportsView, { global: { plugins: [router] } }); await flushPromises()
+  await wrapper.get('.report-row-foot button').trigger('click'); await flushPromises()
+  expect(wrapper.get('.target-visibility').text()).toBe('正常展示')
+  await wrapper.get('textarea').setValue('   ')
+  await wrapper.get('form').trigger('submit'); await flushPromises()
+  expect(api.handleReport).not.toHaveBeenCalled()
+  await wrapper.get('#report-choice').setValue('resolved')
+  await wrapper.get('#report-action').setValue('hide')
+  expect(wrapper.get('.report-action-note').text()).toContain('隐藏该条内容')
+  await wrapper.get('#report-choice').setValue('processing')
+  await wrapper.get('textarea').setValue('  继续核查  ')
+  vi.mocked(api.handleReport).mockResolvedValueOnce({ ...report, status: 'processing' })
+  await wrapper.get('form').trigger('submit'); await flushPromises()
+  expect(api.handleReport).toHaveBeenCalledWith('4', { expectedStatus: 'pending', status: 'processing', action: 'none', reason: '继续核查' })
+  expect(wrapper.find('dialog').exists()).toBe(false)
+  expect(wrapper.get('.reports-notice').text()).toBe('处理结果已保存')
+  wrapper.unmount()
+})
+it('已结案举报只有只读结果，不再挂载处理表单；已删除目标禁用恢复', async () => {
+  vi.mocked(api.reportDetail).mockResolvedValueOnce({ ...report, status: 'resolved', resultNote: '已核实并处理' })
+  const router = await context(true)
+  const wrapper = mount(ReportsView, { global: { plugins: [router] } }); await flushPromises()
+  await wrapper.get('.report-row-foot button').trigger('click'); await flushPromises()
+  expect(wrapper.get('.report-conclusion').text()).toContain('已核实并处理')
+  expect(wrapper.find('form').exists()).toBe(false)
+  await wrapper.get('dialog footer button').trigger('click')
+  vi.mocked(api.reportDetail).mockResolvedValueOnce({ ...report, target: { ...report.target!, visibility: 'deleted', body: null } })
+  await wrapper.get('.report-row-foot button').trigger('click'); await flushPromises()
+  await wrapper.get('#report-choice').setValue('resolved')
+  expect(wrapper.get('option[value="restore"]').attributes('disabled')).toBeDefined()
+  wrapper.unmount()
+})
