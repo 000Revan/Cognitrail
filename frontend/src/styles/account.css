@@ -245,3 +245,13 @@ body { background: var(--page-background); }
  .account-admin-table th,.account-admin-table td { padding:14px; }
  .account-admin-page .route-pagination { flex-wrap:wrap; }
 }
+
+/* Account field validation */
+.form-field input[aria-invalid="true"] { border-color: #ef4444; background: #fffafa; }
+.form-field input[aria-invalid="true"]:focus { border-color: #ef4444; box-shadow: 0 0 0 3px #ef444412; }
+.field-error { display: flex; align-items: flex-start; gap: 6px; color: #e43d3d; font-size: 12px; line-height: 1.6; margin: 6px 0 0; overflow-wrap: anywhere; }
+.form-field { position: relative; }
+.field-error-slot { position: absolute; top: 100%; left: 0; right: 0; margin-top: 3px; line-height: 1.4; }
+.account-form .form-field { margin-bottom: 26px; }
+.account-form > fieldset > .form-submit-error { min-height: 20px; margin-top: 0; }
+.account-form > fieldset > .field-error { margin-bottom: 12px; }

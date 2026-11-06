@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { register } from '../../api/auth'
 import AuthLayout from '../../layouts/AuthLayout.vue'
 import PasswordField from '../../components/common/PasswordField.vue'
+import FieldError from '../../components/common/FieldError.vue'
+import { useAccountValidation } from '../../domain/accountValidation'
 
 const router = useRouter()
 const username = ref('')
@@ -11,18 +13,16 @@ const nickname = ref('')
 const password = ref('')
 const confirmation = ref('')
 const loading = ref(false)
-const error = ref('')
+const { errors, error, blur, validateAll, reject } = useAccountValidation({ username, nickname, password, confirmation }, 'register')
 async function submit() {
   if (loading.value) return
-  error.value = ''
-  if (password.value !== confirmation.value) { error.value = '两次输入的密码不一致'; return }
-  if (!password.value.trim()) { error.value = '密码不能全为空白'; return }
+  if (!validateAll()) return
   loading.value = true
   try {
     await register({ username: username.value, password: password.value, nickname: nickname.value || null })
     password.value = confirmation.value = ''
     await router.replace({ name: 'login', query: { reason: 'registered', username: username.value } })
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : '注册失败，请稍后重试' }
+  } catch (cause) { reject(cause, '注册失败，请稍后重试') }
   finally { loading.value = false }
 }
 </script>
@@ -38,6 +38,7 @@ async function submit() {
     </p>
     <form
       class="account-form"
+      novalidate
       @submit.prevent="submit"
     >
       <fieldset :disabled="loading">
@@ -45,44 +46,49 @@ async function submit() {
           <label for="register-username">用户名</label><input
             id="register-username"
             v-model="username"
+            :aria-invalid="errors.username ? true : undefined"
+            :aria-describedby="errors.username ? 'register-username-error' : undefined"
+            @blur="blur('username')"
             autocomplete="username"
             minlength="3"
             maxlength="30"
             pattern="[A-Za-z0-9_]+"
             required
-            aria-describedby="username-hint"
-          ><p
-            id="username-hint"
-            class="field-hint"
+
           >
-            3–30 位字母、数字或下划线，统一使用小写。
-          </p>
+          <FieldError id="register-username-error" :message="errors.username" />
         </div>
         <div class="form-field">
           <label for="register-nickname">昵称 <span class="optional-label">选填</span></label><input
             id="register-nickname"
             v-model="nickname"
+            :aria-invalid="errors.nickname ? true : undefined"
+            :aria-describedby="errors.nickname ? 'register-nickname-error' : undefined"
+            @blur="blur('nickname')"
             autocomplete="nickname"
             maxlength="50"
             placeholder="希望大家怎么称呼你"
           >
+          <FieldError id="register-nickname-error" :message="errors.nickname" />
         </div>
         <PasswordField
           id="register-password"
           v-model="password"
+          :error="errors.password"
+          @blur="blur('password')"
           label="密码"
           autocomplete="new-password"
-          hint="6–30 位，自动去除空格。"
         />
         <PasswordField
           id="register-confirmation"
           v-model="confirmation"
+          :error="errors.confirmation"
+          @blur="blur('confirmation')"
           label="确认密码"
           autocomplete="new-password"
         />
         <p
-          v-if="error"
-          class="form-error"
+          class="field-error form-submit-error"
           role="alert"
         >
           {{ error }}

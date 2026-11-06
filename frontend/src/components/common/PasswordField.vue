@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import FieldError from './FieldError.vue'
 
 const model = defineModel<string>({ required: true })
-defineProps<{ id: string; label: string; autocomplete: string; hint?: string }>()
+defineProps<{ id: string; label: string; autocomplete: string; hint?: string; error?: string }>()
+defineEmits<{ blur: [] }>()
 const visible = ref(false)
 
 function normalize(value: string) { return value.replace(/\s/g, '') }
@@ -36,8 +38,10 @@ function paste(event: ClipboardEvent) {
         :autocomplete="autocomplete"
         minlength="6"
         maxlength="30"
-        :aria-describedby="hint ? id + '-hint' : undefined"
+        :aria-describedby="error ? id + '-error' : hint ? id + '-hint' : undefined"
+        :aria-invalid="error ? true : undefined"
         required
+        @blur="$emit('blur')"
         @input="update"
         @paste="paste"
       >
@@ -62,8 +66,9 @@ function paste(event: ClipboardEvent) {
         /></svg>
       </button>
     </div>
+    <FieldError :id="id + '-error'" :message="error" />
     <p
-      v-if="hint"
+      v-if="hint && !error"
       :id="id + '-hint'"
       class="field-hint"
     >

@@ -3,12 +3,12 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '../components/common/AppIcon.vue'
 import UserAvatar from '../components/common/UserAvatar.vue'
-import AppDialog from '../components/common/AppDialog.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore(), route = useRoute(), router = useRouter()
 const opened = ref(false), drawer = ref<HTMLElement>(), trigger = ref<HTMLButtonElement>()
 const account = ref(false), busy = ref(false), error = ref('')
+const accountRoot = ref<HTMLElement>(), accountTrigger = ref<HTMLButtonElement>()
 const links = [
   { to: '/admin/roadmaps', title: '社区路线管理', icon: 'repository', note: '内容审核与治理' },
   { to: '/admin/reports', title: '举报处理', icon: 'shield', note: '受理、复核与结案' },
@@ -18,8 +18,38 @@ const links = [
 ]
 const current = computed(() => links.find(link => route.path.startsWith(link.to)) || links[0])
 const displayName = computed(() => auth.user?.nickname || auth.user?.username || '管理员')
-watch(() => route.fullPath, () => { opened.value = false; account.value = false })
+watch(() => route.fullPath, () => { opened.value = false; account.value = false; error.value = '' })
+watch(() => auth.authenticated, value => { if (!value) account.value = false })
+async function toggleAccount(event: MouseEvent) {
+  account.value = !account.value
+  if (account.value && event.detail === 0) {
+    await nextTick()
+    accountRoot.value?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+  }
+}
+async function accountKeys(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault(); account.value = false; accountTrigger.value?.focus(); return
+  }
+  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+  if (!account.value && !['ArrowDown', 'ArrowUp'].includes(event.key)) return
+  event.preventDefault()
+  if (!account.value) { account.value = true; await nextTick() }
+  const items = Array.from(accountRoot.value?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)') || [])
+  const current = items.indexOf(document.activeElement as HTMLElement)
+  const index = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+    : current < 0 ? (event.key === 'ArrowUp' ? items.length - 1 : 0)
+    : (current + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length
+  items[index]?.focus()
+}
+function outsideAccount(event: PointerEvent) {
+  if (!accountRoot.value?.contains(event.target as Node)) account.value = false
+}
+function accountFocusOut(event: FocusEvent) {
+  if (!accountRoot.value?.contains(event.relatedTarget as Node | null)) account.value = false
+}
 async function toggle() {
+  account.value = false
   opened.value = !opened.value
   if (opened.value) { await nextTick(); drawer.value?.querySelector<HTMLElement>('a')?.focus() }
 }
@@ -27,8 +57,8 @@ function close() { opened.value = false; trigger.value?.focus() }
 function escape(event: KeyboardEvent) {
   if (opened.value && event.key === 'Escape') { event.preventDefault(); close() }
 }
-onMounted(() => window.addEventListener('keydown', escape))
-onBeforeUnmount(() => window.removeEventListener('keydown', escape))
+onMounted(() => { window.addEventListener('keydown', escape); document.addEventListener('pointerdown', outsideAccount) })
+onBeforeUnmount(() => { window.removeEventListener('keydown', escape); document.removeEventListener('pointerdown', outsideAccount) })
 function keys(event: KeyboardEvent) {
   if (event.key === 'Escape') { event.preventDefault(); close() }
   if (event.key !== 'Tab') return
@@ -38,8 +68,9 @@ function keys(event: KeyboardEvent) {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
 }
 async function logout() {
+  if (busy.value) return
   busy.value = true; error.value = ''
-  try { await auth.logout(); await router.replace('/login') }
+  try { await auth.logout(); if (!auth.authenticated) await router.replace('/login') }
   catch (cause) { error.value = cause instanceof Error ? cause.message : '退出失败，请重试' }
   finally { busy.value = false }
 }
@@ -80,16 +111,37 @@ async function logout() {
           class="admin-system-link"
         ><span class="admin-status-dot" />系统信息</RouterLink>
         <span class="admin-topbar-divider" />
-        <button
-          class="admin-account"
-          aria-label="管理员账号菜单"
-          @click="account = true"
+        <div
+          ref="accountRoot"
+          class="account-dropdown admin-account-dropdown"
+          @keydown="accountKeys"
+          @focusout="accountFocusOut"
         >
-          <UserAvatar
-            :name="displayName"
-            :src="auth.user?.avatarUrl"
-          /><span><strong>{{ displayName }}</strong><small>管理员</small></span><AppIcon name="chevron" />
-        </button>
+          <button
+            ref="accountTrigger"
+            type="button"
+            class="admin-account"
+            aria-label="管理员账号菜单"
+            aria-haspopup="menu"
+            aria-controls="admin-account-menu"
+            :aria-expanded="account"
+            @click="toggleAccount"
+          >
+            <UserAvatar :name="displayName" :src="auth.user?.avatarUrl" />
+            <span><strong>{{ displayName }}</strong><small>管理员</small></span>
+            <AppIcon name="chevron" />
+          </button>
+          <div v-if="account" id="admin-account-menu" class="account-menu" role="menu" aria-label="管理员账号菜单">
+            <RouterLink to="/admin/account" role="menuitem" tabindex="-1" @click="account = false">
+              <AppIcon name="settings" /><span>账号设置</span>
+            </RouterLink>
+            <div class="menu-divider" role="separator" />
+            <button type="button" class="logout-button" role="menuitem" tabindex="-1" :disabled="busy" @click="logout">
+              <AppIcon name="logout" />{{ busy ? '正在退出…' : '退出登录' }}
+            </button>
+            <p v-if="error" class="form-error menu-error" role="alert">{{ error }}</p>
+          </div>
+        </div>
       </div>
     </header>
     <aside
@@ -151,36 +203,7 @@ async function logout() {
         </div>
       </section>
     </template>
-    <AppDialog
-      v-if="account"
-      title="管理员账号"
-      :busy="busy"
-      @close="account = false"
-    >
-      <p>{{ displayName }} · @{{ auth.user?.username }}</p><p class="muted">
-        此账号专用于平台管理与官方内容维护。
-      </p>
-      <p
-        v-if="error"
-        role="alert"
-        class="form-error"
-      >
-        {{ error }}
-      </p>
-      <template #footer>
-        <RouterLink
-          class="outline-link"
-          to="/admin/account"
-          @click="account = false"
-        >账号设置</RouterLink><button
-          class="primary-button"
-          :disabled="busy"
-          @click="logout"
-        >
-          {{ busy ? '正在退出…' : '退出登录' }}
-        </button>
-      </template>
-    </AppDialog>
+
   </div>
 </template>
 
@@ -200,4 +223,7 @@ async function logout() {
 .admin-account>.user-avatar{display:inline-flex;flex-shrink:0}.admin-account{min-height:44px}.admin-account strong{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .admin-shell .danger-button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 20px;background:#fff4f2;border:1px solid #e7c1ba;border-radius:8px;color:#a14439;font-size:13px;font-weight:600;cursor:pointer;transition:background .18s}.admin-shell .danger-button:hover{background:#fbe7e3}.admin-shell .danger-button:disabled{opacity:.5;cursor:default}
 .admin-rail{overflow-y:auto}.admin-rail>a{flex-shrink:0}
+.admin-account-dropdown{position:relative}
+.admin-account-dropdown .account-menu{width:210px;max-width:calc(100vw - 24px);top:calc(100% + 12px)}
+.admin-account[aria-expanded="true"]>.app-icon{transform:rotate(180deg)}
 </style>
