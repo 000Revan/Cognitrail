@@ -14,14 +14,15 @@ const items = ref<EnrollmentSummary[]>([])
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')
-const pages = computed(() => Math.max(1, Math.ceil(total.value / 12)))
+const pageSize = 6
+const pages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 let generation = 0
 async function load() {
   const ticket = ++generation
   items.value = []; total.value = 0; loading.value = true; error.value = ''
   if (!auth.authenticated) { loading.value = false; return }
   try {
-    const result = await myEnrollments({ status: abandoned.value ? 'abandoned' : 'active', page: page.value })
+    const result = await myEnrollments({ status: abandoned.value ? 'abandoned' : 'active', page: page.value, pageSize })
     if (ticket !== generation) return
     items.value = result.items; total.value = result.total
     if (page.value > pages.value) await router.replace({ query: { ...route.query, page: pages.value > 1 ? String(pages.value) : undefined } })

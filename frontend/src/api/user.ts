@@ -22,8 +22,8 @@ export async function changeFollow(id: string, enabled: boolean) {
 export async function getActivities(id: string | null, page = 1, pageSize = 12) {
   return (await http.get<ApiResponse<Page<ActivitySummary>>>(id ? '/api/v1/users/' + encodeURIComponent(id) + '/activities' : '/api/v1/users/me/feed', { params: { page, pageSize } })).data.data
 }
-export async function getPublicCollection(id: string, category: 'favorite' | 'learning', page = 1) {
-  return (await http.get<ApiResponse<Page<PublicRoadmap>>>('/api/v1/users/' + encodeURIComponent(id) + '/collections', { params: { category, page } })).data.data
+export async function getPublicCollection(id: string, category: 'favorite' | 'learning', page = 1, pageSize = 12) {
+  return (await http.get<ApiResponse<Page<PublicRoadmap>>>('/api/v1/users/' + encodeURIComponent(id) + '/collections', { params: { category, page, pageSize } })).data.data
 }
 export async function getFollowing(page = 1) {
   return (await http.get<ApiResponse<Page<PublicIdentity>>>('/api/v1/users/me/following', { params: { page } })).data.data

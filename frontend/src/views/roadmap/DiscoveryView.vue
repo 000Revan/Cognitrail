@@ -30,7 +30,8 @@ const loading = ref(false)
 const error = ref('')
 const actionErrors = ref<Record<string, string>>({})
 const busy = ref<string[]>([])
-const pageCount = computed(() => Math.max(1, Math.ceil(total.value / 12)))
+const pageSize = 6
+const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 let request = 0
 
 async function load() {
@@ -42,12 +43,12 @@ async function load() {
   loading.value = true; error.value = ''; actionErrors.value = {}; items.value = []; total.value = 0; busy.value = []
   try {
     if (favorites.value) {
-      const result = await myFavorites({ page: page.value })
+      const result = await myFavorites({ page: page.value, pageSize })
       if (ticket !== request) return
       items.value = result.items; total.value = result.total
     } else {
       const [sortBy, order] = sort.value.split(':')
-      const result = await publicRoadmaps({ q: query.value, difficulty: difficulty.value || undefined, page: page.value, sortBy, order })
+      const result = await publicRoadmaps({ q: query.value, difficulty: difficulty.value || undefined, page: page.value, pageSize, sortBy, order })
       if (ticket !== request) return
       items.value = result.items.map(card => ({ roadmapId: card.id, title: card.title, status: 'published',
         accessible: true, favoritedAt: '', roadmap: card }))

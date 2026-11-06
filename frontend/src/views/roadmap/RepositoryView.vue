@@ -31,7 +31,8 @@ const busy = ref(false)
 const createError = ref('')
 const selected = ref<{ route: RoadmapSummary; action: 'archive' | 'delete' | 'restore' | 'withdraw' } | null>(null)
 const disabledRoute = ref<RoadmapSummary | null>(null)
-const pageCount = computed(() => Math.max(1, Math.ceil(total.value / 12)))
+const pageSize = computed(() => management.value ? 12 : 6)
+const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 let request = 0
 async function load() {
   const ticket = ++request
@@ -39,7 +40,7 @@ async function load() {
   try {
     const data = management.value
       ? await adminRoadmaps({ officialOnly: official.value, archived: archived.value, status: state.value || undefined, keyword: query.value, page: page.value })
-      : await myRoadmaps({ archived: archived.value, state: state.value || undefined, q: query.value, page: page.value })
+      : await myRoadmaps({ archived: archived.value, state: state.value || undefined, q: query.value, page: page.value, pageSize: pageSize.value })
     if (ticket !== request) return
     items.value = data.items; total.value = data.total
     if (!data.items.length && page.value > 1) { page.value--; void load() }

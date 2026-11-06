@@ -29,7 +29,8 @@ const profile = ref<PublicProfile | null>(null)
 const works = ref<PublicRoadmap[]>([]), activities = ref<ActivitySummary[]>([])
 const total = ref(0), followBusy = ref(false), followError = ref(''), activityError = ref('')
 const privacyOpen = ref(false), privacyBusy = ref(false)
-const pages = computed(() => Math.max(1, Math.ceil(total.value / 12)))
+const pageSize = computed(() => isListing.value ? 6 : 12)
+const pages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 const data = ref<LearningOverview | null>(null), month = ref(''), error = ref(''), loading = ref(false)
 const activityLabels = { publish: '发布了路线', topic: '发布了话题', checkin: '完成了学习打卡' }
 const activityIcons = { publish: 'learn', topic: 'message', checkin: 'check' }
@@ -92,10 +93,10 @@ async function load() {
     }
     if (isListing.value) {
       if (!['works', 'favorite', 'learning'].includes(category.value)) throw new Error('列表不存在')
-      const user = await getPublicProfile(profileId.value, category.value === 'works' ? page.value : 1, 12)
+      const user = await getPublicProfile(profileId.value, category.value === 'works' ? page.value : 1, pageSize.value)
       if (ticket !== generation) return
       profile.value = user
-      const result = category.value === 'works' ? user.roadmaps : await getPublicCollection(profileId.value, category.value as 'favorite' | 'learning', page.value)
+      const result = category.value === 'works' ? user.roadmaps : await getPublicCollection(profileId.value, category.value as 'favorite' | 'learning', page.value, pageSize.value)
       if (ticket !== generation) return
       works.value = result.items; total.value = result.total
       return

@@ -8,7 +8,7 @@ export async function enrollRoadmap(roadmapId: string, releaseId: string) {
 export async function dismissUpdatePrompt(id: string, releaseId: string, dismissed: boolean) {
   return (await http.put<ApiResponse<EnrollmentSummary>>(`/api/v1/enrollments/${id}/update-prompt`, { releaseId, dismissed })).data.data
 }
-export async function myEnrollments(params: { status?: EnrollmentStatus; page?: number }) {
+export async function myEnrollments(params: { status?: EnrollmentStatus; page?: number; pageSize?: number }) {
   return (await http.get<ApiResponse<Page<EnrollmentSummary>>>('/api/v1/users/me/enrollments', { params })).data.data
 }
 export async function enrollmentSummary(id: string, sessionId?: string) {

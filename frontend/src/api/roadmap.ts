@@ -2,10 +2,10 @@ import { http } from './http'
 import type { ApiResponse, Page } from '../types/common'
 import type { DraftResponse, FavoriteItem, PublicationIssue, PublicRoadmap, RoadmapDetail, RoadmapDocument, RoadmapSummary } from '../types/roadmap'
 
-export async function publicRoadmaps(params: { q?: string; difficulty?: string; page?: number; sortBy?: string; order?: string }) {
+export async function publicRoadmaps(params: { q?: string; difficulty?: string; page?: number; pageSize?: number; sortBy?: string; order?: string }) {
   return (await http.get<ApiResponse<Page<PublicRoadmap>>>('/api/v1/roadmaps', { params })).data.data
 }
-export async function myFavorites(params: { page?: number }) {
+export async function myFavorites(params: { page?: number; pageSize?: number }) {
   return (await http.get<ApiResponse<Page<FavoriteItem>>>('/api/v1/users/me/favorites', { params })).data.data
 }
 export async function changeFavorite(id: string, enabled: boolean) {
@@ -15,7 +15,7 @@ export async function changeFavorite(id: string, enabled: boolean) {
   return response.data.data
 }
 
-export async function myRoadmaps(params: { archived: boolean; state?: string; q?: string; page?: number }) {
+export async function myRoadmaps(params: { archived: boolean; state?: string; q?: string; page?: number; pageSize?: number }) {
   return (await http.get<ApiResponse<Page<RoadmapSummary>>>('/api/v1/roadmaps/mine', { params })).data.data
 }
 export async function createRoadmap(title: string, official = false) {
