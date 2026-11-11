@@ -46,61 +46,11 @@
                         font-size:10px;
                         letter-spacing:2.7px;
                         color:var(--muted)}
-                        .nav-label{
-                          font-size:11px;
-                          color:#768072;
-                          letter-spacing:2px;
-                          margin:54px 12px 14px}
-                          .nav-link{
-                            display:flex;
-                            align-items:center;
-                            gap:12px;
-                            min-height:48px;
-                            padding:12px 14px;
-                            border-radius:9px;
-                            background:var(--green-soft);
-                            color:var(--green);
-                            font-size:14px;
-                            font-weight:600}
-                            .nav-link svg{
-                              width:19px;
-                              height:19px;
-                              stroke:currentColor;
-                              stroke-width:1.5}
-                              .sidebar-note{
-                                margin-top:auto;
-                                padding:80px 10px 36px}
                                 .small-label{
                                   font-size:10px;
                                   letter-spacing:1.8px;
                                   color:var(--muted);
                                   font-weight:600}
-                                  .sidebar-note p{
-                                    font-size:12px;
-                                    color:var(--muted);
-                                    line-height:2;
-                                    margin:12px 0 24px}
-                                    .trail-line{
-                                      display:flex;
-                                      align-items:center;
-                                      width:118px}
-                                      .trail-line i{
-                                        display:block;
-                                        width:8px;
-                                        height:8px;
-                                        border-radius:50%;
-                                        border:1px solid #7b9279}
-                                        .trail-line i:last-child{
-                                          background:#7b9279}
-                                          .trail-line span{
-                                            flex:1;
-                                            border-top:1px dashed #b8c5b0}
-                                            .sidebar-footer{
-                                              border-top:1px solid var(--line);
-                                              padding:22px 4px 0;
-                                              font-size:10px;
-                                              color:var(--muted);
-                                              letter-spacing:1px}
                                               .workspace{
                                                 flex:1;
                                                 min-width:0;
@@ -435,16 +385,6 @@
                                                                                                                                                                                                     .brand small{
                                                                                                                                                                                                       font-size:8px;
                                                                                                                                                                                                       letter-spacing:1.5px}
-                                                                                                                                                                                                      .nav-link{
-                                                                                                                                                                                                        margin-left:auto;
-                                                                                                                                                                                                        min-height:44px;
-                                                                                                                                                                                                        padding:10px;
-                                                                                                                                                                                                        font-size:12px}
-                                                                                                                                                                                                        .nav-link svg{
-                                                                                                                                                                                                          width:16px;
-                                                                                                                                                                                                          height:16px}
-                                                                                                                                                                                                          .sidebar-note,.sidebar-footer,.nav-label{
-                                                                                                                                                                                                            display:none}
                                                                                                                                                                                                             .topbar{
                                                                                                                                                                                                               height:64px;
                                                                                                                                                                                                               padding-inline:20px;

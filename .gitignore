@@ -1,46 +1,89 @@
-# 本地配置与凭证（保留可提交的配置模板）
+# Local environment and secrets; keep distributable templates.
 .env
 .env.*
 !.env.example
 !.env.*.example
 !.env.sample
 
-# Python 环境、缓存与打包产物
+# Dependencies and Python / frontend caches.
 .venv/
 venv/
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/cache/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
 .pytype/
+.hypothesis/
+.tox/
+.nox/
+.vite/
+.cache/
+*.tsbuildinfo
 *.egg-info/
 .eggs/
-build/
-dist/
+
+# Tests stay local: sources, runner configuration and generated results.
+tests/
+test/
+__tests__/
+__mocks__/
+*.test.*
+*.spec.*
+test_*.py
+*_test.py
+conftest.py
+pytest.ini
+.coveragerc
+playwright.config.*
+vitest.config.*
+jest.config.*
+coverage/
+htmlcov/
 .coverage
 .coverage.*
-htmlcov/
 coverage.xml
-
-# 前端依赖、构建与测试报告
-node_modules/
-.pnpm-store/
-.vite/
-coverage/
-playwright-report/
-playwright/.cache/
+junit.xml
+junit-*.xml
 test-results/
+playwright-report/
 blob-report/
-*.tsbuildinfo
+allure-results/
+allure-report/
+playwright/.cache/
 
-# 本地运行数据、上传文件与日志
-.cache/
+# Generated builds, runtime files and uploaded user data.
+build/
+dist/
 .data/
+logs/
 *.log
 *.pid
+*.pid.lock
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite3-journal
 
-# 编辑器与操作系统文件
+# Archives, backups and temporary files.
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+*.bak
+*.old
+*.orig
+*.tmp
+*.temp
+~$*
+
+# Editor / operating system files.
 .idea/
 .vscode/
 .DS_Store
@@ -48,6 +91,13 @@ Thumbs.db
 Desktop.ini
 *.swp
 *.swo
-~$*
 
-# uv.lock、pnpm-lock.yaml、数据库迁移、源码与项目文档应提交。
+# Non-application documentation, progress notes and duplicate checkouts.
+/docs/
+/git/
+/task_progress.md
+/项目架构设计.md
+
+# Keep application sources, public assets, migrations, maintenance scripts,
+# README, .env.example, pyproject.toml, package.json, uv.lock and pnpm-lock.yaml.
+# Ignore rules do not remove files that Git already tracks.

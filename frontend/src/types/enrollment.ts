@@ -26,7 +26,6 @@ export interface LearningOverview {
   learningRoadmapCount: number; completedNodeCount: number; checkinDayCount: number
   currentStreak: number; longestStreak: number; today: string; month: string; calendarDates: string[]
 }
-export function enrollmentStatusName(status: EnrollmentStatus) { return status === 'active' ? '学习中' : '已退出' }
 
 export interface UpgradeNodeDifference {
   stableKey: string; sourceTitle: string | null; targetTitle: string | null

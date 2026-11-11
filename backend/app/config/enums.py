@@ -19,18 +19,6 @@ class Difficulty(StrEnum):
     ADVANCED = "advanced"
 
 
-class RoadmapStatus(StrEnum):
-    DRAFT = "draft"
-    PUBLISHED = "published"
-    WITHDRAWN = "withdrawn"
-    DISABLED = "disabled"
-
-
-class EnrollmentStatus(StrEnum):
-    ACTIVE = "active"
-    ABANDONED = "abandoned"
-
-
 class ResourceType(StrEnum):
     BOOK = "book"
     ARTICLE = "article"

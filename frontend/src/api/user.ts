@@ -11,7 +11,6 @@ export async function getRelationships(id: string, kind: 'following' | 'follower
 export interface FollowState { isFollowing: boolean; followerCount: number; followingCount: number }
 export interface PublicProfile extends PublicIdentity, FollowState { canFollow: boolean; canViewFavorites: boolean; canViewLearning: boolean; favoriteCount: number | null; learningCount: number | null; roadmaps: Page<PublicRoadmap> }
 export interface ActivitySummary { id: string; actorId: string; nickname: string; avatarUrl: string | null; activityType: 'publish' | 'topic' | 'checkin'; occurredOn: string; createdAt: string; routeCount: number; roadmapId: string | null; title: string | null; issueId?: string | null }
-export interface MyDiscussion { id: string; issueId: string; roadmapId: string; roadmapTitle: string; title: string; body: string; status: string; commentId: string | null; createdAt: string }
 export async function getPublicProfile(id: string, page = 1, pageSize = 12) {
   return (await http.get<ApiResponse<PublicProfile>>('/api/v1/users/' + encodeURIComponent(id) + '/profile', { params: { page, pageSize } })).data.data
 }
@@ -25,15 +24,9 @@ export async function getActivities(id: string | null, page = 1, pageSize = 12) 
 export async function getPublicCollection(id: string, category: 'favorite' | 'learning', page = 1, pageSize = 12) {
   return (await http.get<ApiResponse<Page<PublicRoadmap>>>('/api/v1/users/' + encodeURIComponent(id) + '/collections', { params: { category, page, pageSize } })).data.data
 }
-export async function getFollowing(page = 1) {
-  return (await http.get<ApiResponse<Page<PublicIdentity>>>('/api/v1/users/me/following', { params: { page } })).data.data
-}
 export async function roadmapSubscription(id: string, subscribed?: boolean) {
   const path = '/api/v1/roadmaps/' + encodeURIComponent(id) + '/subscription'
   return (subscribed === undefined ? await http.get<ApiResponse<{ subscribed: boolean }>>(path) : await http.put<ApiResponse<{ subscribed: boolean }>>(path, { subscribed })).data.data
-}
-export async function getMyDiscussions(kind: 'questions' | 'replies', page = 1) {
-  return (await http.get<ApiResponse<Page<MyDiscussion>>>('/api/v1/users/me/discussions', { params: { kind, page } })).data.data
 }
 
 export async function getMe() {

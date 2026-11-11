@@ -1,10 +1,7 @@
 """全部业务表共用一个元数据及表级配置。"""
 
-from datetime import datetime
-
-from sqlalchemy import MetaData, text
-from sqlalchemy.dialects.mysql import BIGINT, DATETIME, VARCHAR
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import MetaData
+from sqlalchemy.orm import DeclarativeBase
 
 TABLE_OPTIONS = {
     "mysql_engine": "InnoDB",
@@ -18,30 +15,3 @@ class Base(DeclarativeBase):
 
     # 约束和索引在模型中显式命名，与已执行的冻结基线保持一致。
     metadata = MetaData()
-
-
-class IdMixin:
-    id: Mapped[int] = mapped_column(
-        BIGINT(unsigned=True), primary_key=True, autoincrement=True, comment="主键"
-    )
-
-
-class CreatedAtMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        DATETIME(fsp=6),
-        server_default=text("CURRENT_TIMESTAMP(6)"),
-        comment="创建时间 UTC",
-    )
-
-
-class UpdatedAtMixin:
-    updated_at: Mapped[datetime] = mapped_column(
-        DATETIME(fsp=6),
-        server_default=text("CURRENT_TIMESTAMP(6)"),
-        comment="修改时间 UTC，由服务层更新",
-    )
-
-
-def ascii_type(length: int = 16) -> VARCHAR:
-    """状态和 UUID 采用 ASCII 二进制比较。"""
-    return VARCHAR(length, charset="ascii", collation="ascii_bin")
