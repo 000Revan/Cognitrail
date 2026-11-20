@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "知途工坊 API"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "fastapi>=0.115,<1",
+    "fastapi>=0.135,<1",
     "pydantic>=2.10,<3",
     "pydantic-settings>=2.7,<3",
     "sqlalchemy[asyncio]>=2.0.36,<2.1",
@@ -15,6 +15,9 @@ dependencies = [
     "pyjwt>=2.10,<3",
     "pwdlib[argon2]>=0.2,<1",
     "pillow>=12.3,<14",
+    "langchain-openai>=1.7.4",
+    "structlog==25.5.0",
+    "langgraph>=1.0,<2",
 ]
 
 [dependency-groups]

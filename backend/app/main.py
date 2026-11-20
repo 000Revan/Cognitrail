@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+
 from app.config.settings import Settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging

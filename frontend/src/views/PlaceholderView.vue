@@ -19,9 +19,8 @@ const route = useRoute()
       role="status"
     >
       <span class="placeholder-icon"><AppIcon :name="String(route.meta.icon || 'repository')" /></span>
-      <h2>公开社区正在升级</h2>
-      <p>此入口暂未开放。你可以先使用社区发现、路线创作、学习和问题反馈，其他功能完成验证后将逐步恢复。</p>
-      <RouterLink to="/environment">查看运行状态</RouterLink>
+      <h2>页面正在准备中</h2>
+      <RouterLink to="/">探索社区路线</RouterLink>
     </div>
   </section>
 </template>

@@ -160,6 +160,11 @@ async function logout() {
           to="/learning"
           :class="{ 'nav-current': String(route.name).startsWith('learning') || route.name === 'dashboard' }"
         >我的学习</RouterLink>
+        <RouterLink
+          to="/assistant"
+          :class="{ 'nav-current': route.name === 'assistant' }"
+          :aria-current="route.name === 'assistant' ? 'page' : undefined"
+        >工坊助手</RouterLink>
       </nav>
       <div class="account-actions">
         <RouterLink
@@ -262,8 +267,11 @@ async function logout() {
       >
         <RouterView />
       </main>
-      <footer class="workspace-footer">
-        <span>知途工坊 · Cognitrail</span><RouterLink to="/environment">运行环境</RouterLink><span>让经验成为路径。</span>
+      <footer
+        v-if="route.name !== 'assistant'"
+        class="workspace-footer"
+      >
+        <span>知途工坊 · Cognitrail</span><span>让经验成为路径。</span>
       </footer>
     </div>
   </div>
@@ -279,5 +287,8 @@ async function logout() {
 .site-navigation a { display: flex; align-items: center; min-height: 44px; height: 100%; border-bottom: 2px solid transparent; }
 .site-navigation a:hover { color: var(--green); }
 .site-navigation a.nav-current { color: var(--green); border-bottom-color: var(--green); font-weight: 600; }
+.site-navigation { flex-shrink: 0; }
+@media(min-width: 761px) and (max-width: 1000px) { .site-navigation { gap: 18px; } .unified-shell .topbar { padding-inline: 20px; } .account-actions { gap: 12px; } }
 @media(max-width: 760px) { .unified-shell .topbar { padding: 0 16px; flex-wrap: wrap; height: 120px; gap: 0 12px; } .unified-shell .topbar-brand { height: 66px; } .site-navigation { order: 3; width: 100%; height: 54px; gap: 28px; justify-content: center; } .unified-shell .workspace { padding-top: 120px; } }
+@media(max-width: 760px) { .site-navigation { gap: 20px; justify-content: flex-start; overflow-x: auto; white-space: nowrap; } }
 </style>

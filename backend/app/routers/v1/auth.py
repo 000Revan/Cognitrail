@@ -20,7 +20,7 @@ async def register(data: RegisterRequest, service: AuthServiceDep):
     "/login", response_model=ApiResponse[LoginResponse], dependencies=[Depends(check_login_rate)]
 )
 async def login(data: LoginRequest, service: AuthServiceDep):
-    """JSON 登录，返回仅供内存保存的访问凭证。"""
+    """JSON 登录，返回当前访问凭证、有效时长和账号资料。"""
     return ApiResponse(msg="登录成功", data=await service.login(data))
 
 

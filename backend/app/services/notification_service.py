@@ -1,18 +1,18 @@
 """可靠通知与本人消息中心；消息只保存目标ID。"""
 
 import asyncio
-import logging
 from datetime import timedelta
 from uuid import uuid4
 
 from app.core.exceptions import AppError
+from app.core.logging import get_logger
 from app.database.crud import notification as crud
 from app.database.models import IssueComment, Notification, RoadmapIssue
 from app.schemas.common import serialize_utc
 from app.services.auth_service import authenticated_account
 from app.services.issue_service import accessible_route, now
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class OutboxDispatcher:
@@ -146,7 +146,7 @@ class OutboxDispatcher:
             try:
                 worked = await self.run_once()
             except Exception as exc:
-                logger.warning("outbox_poll_failed error_type=%s", type(exc).__name__)
+                logger.warning("outbox_poll_failed", error_type=type(exc).__name__)
                 worked = False
             await asyncio.sleep(0.05 if worked else self.settings.outbox_poll_seconds)
 

@@ -1,6 +1,5 @@
 """将业务异常、请求校验错误及未知错误统一封装。"""
 
-import logging
 from http import HTTPStatus
 
 from fastapi import FastAPI, Request
@@ -9,9 +8,10 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 from app.core.exceptions import AppError
+from app.core.logging import get_logger
 from app.schemas.common import ApiResponse, ErrorData
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def error_response(request: Request, error: AppError) -> JSONResponse:
@@ -78,8 +78,8 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def unexpected_handler(request: Request, error: Exception) -> JSONResponse:
         # 不输出异常字符串，避免驱动错误中携带连接参数。
         logger.error(
-            "unexpected_error request_id=%s type=%s",
-            getattr(request.state, "request_id", "unknown"),
-            type(error).__name__,
+            "unexpected_error",
+            request_id=getattr(request.state, "request_id", "unknown"),
+            error_type=type(error).__name__,
         )
         return error_response(request, AppError(500, "INTERNAL_ERROR", "服务暂时不可用"))

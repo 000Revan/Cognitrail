@@ -1,12 +1,11 @@
 """账号、隐私及社区作者主页服务，关系、活动与审计遵守事务边界。"""
 
-import logging
-
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.enums import UserRole
 from app.core.exceptions import AppError
+from app.core.logging import get_logger
 from app.core.security import AuthClaims, hash_password, utc_now, verify_password
 from app.database.crud import user as crud
 from app.domain.account_policy import require_current_user
@@ -20,7 +19,7 @@ from app.schemas.user import (
 from app.services.auth_service import authenticated_account
 from app.services.avatar_service import AvatarStore
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class UserService:

@@ -8,6 +8,7 @@ export const router = createRouter({
       path: '/',
       component: MainLayout,
       children: [
+        { path: 'assistant', name: 'assistant', component: () => import('../views/AssistantView.vue'), meta: { title: '工坊助手', requiresAuth: true } },
         { path: 'preparing', name: 'community-pending', component: () => import('../views/PlaceholderView.vue'), meta: { title: '社区升级中' } },
         { path: '', name: 'community', component: () => import('../views/roadmap/DiscoveryView.vue'), meta: { title: '社区发现' } },
         { path: 'profile', name: 'profile', component: () => import('../views/personal/HomeView.vue'), meta: { title: '个人主页', requiresAuth: true } },

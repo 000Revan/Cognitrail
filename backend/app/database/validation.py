@@ -42,6 +42,9 @@ COMMUNITY_APPLICATION_READY = False
 # 各业务阶段完成新契约和权限联调后才在此登记，不能通过.env绕过。
 COMMUNITY_ENABLED_ENDPOINTS: frozenset[tuple[str, str]] = frozenset(
     {
+        ("POST", "/api/v1/agent/chat"),
+        ("GET", "/api/v1/agent/conversations"),
+        ("GET", "/api/v1/agent/conversations/{conversation_id}/messages"),
         ("PUT", "/api/v1/users/{user_id}/follow"),
         ("DELETE", "/api/v1/users/{user_id}/follow"),
         ("GET", "/api/v1/users/me/following"),

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 
 from app.core.exceptions import AppError
 from app.database import validation
+from app.routers.v1.agent import router as agent_router
 from app.routers.v1.auth import router as auth_router
 from app.routers.v1.enrollments import router as enrollments_router
 from app.routers.v1.issues import router as issues_router
@@ -35,6 +36,7 @@ def require_community_endpoint(request: Request) -> None:
 
 router = APIRouter(prefix=API_PREFIX, dependencies=[Depends(require_community_endpoint)])
 router.include_router(auth_router)
+router.include_router(agent_router)
 router.include_router(users_router)
 router.include_router(roadmaps_router)
 router.include_router(enrollments_router)

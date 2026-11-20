@@ -38,7 +38,7 @@ onBeforeUnmount(() => { generation++ })
       <div>
         <p class="eyebrow">
           YOUR LEARNING
-        </p><h1>我的学习</h1><p>每条路线保留一份学习关系，继续上次的位置。</p>
+        </p><h1>我的学习</h1><p>沿着选择的路线，继续探索。</p>
       </div><RouterLink
         to="/dashboard"
         class="outline-link"
@@ -62,7 +62,7 @@ onBeforeUnmount(() => { generation++ })
         :aria-pressed="abandoned"
         @click="router.push('/learning?status=abandoned')"
       >
-        已退出的历史
+        已退出
       </button>
     </div>
     <p
@@ -117,7 +117,7 @@ onBeforeUnmount(() => { generation++ })
           v-if="!item.contentAvailable"
           class="form-error"
         >
-          内容已下架，正文与新增学习操作不可用。
+          路线已下架，暂时无法继续学习。
         </p>
         <p
           v-if="item.hasNewVersion"

@@ -101,3 +101,61 @@ Desktop.ini
 # Keep application sources, public assets, migrations, maintenance scripts,
 # README, .env.example, pyproject.toml, package.json, uv.lock and pnpm-lock.yaml.
 # Ignore rules do not remove files that Git already tracks.
+
+# Local assistant instructions and project planning (not application runtime).
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.agents/
+.codex/
+.claude/
+.cursor/
+/REQUIREMENTS.md
+/Cognitrail/REQUIREMENTS.md
+/agent_development_plan.md
+
+# Local research, reports, exports and duplicate material.
+notebooks/
+.ipynb_checkpoints/
+*.ipynb
+reports/
+artifacts/
+screenshots/
+backups/
+exports/
+tmp/
+temp/
+*.dump
+*.sql.gz
+*.sql.bz2
+*.sql.xz
+*.db
+*.db-journal
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.backup
+*.patch
+*.rej
+
+# Private keys and local credentials; public certificates remain eligible.
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+
+# Additional local dependency caches and test tooling.
+env/
+ENV/
+.bun/
+.yarn/unplugged/
+.yarn/install-state.gz
+.nyc_output/
+*.lcov
+.pyre/
+.dmypy.json
+.pyright/
+.cache-loader/
+*.local

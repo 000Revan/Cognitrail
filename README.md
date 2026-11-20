@@ -1,6 +1,8 @@
 # 知途工坊 Cognitrail
 
-面向自学者的学习路线社区平台。用户可以发现并收藏公开路线，围绕阶段、节点和推荐资源开展学习，也可以创建自己的路线并发布到社区。
+面向自学者的学习路线创作、分享与发现社区。路线以阶段、节点组织学习目标、建议顺序与外部参考链接；位置恢复、完成标记与自愿打卡是辅助能力。
+
+**产品需求统一见 [REQUIREMENTS.md](REQUIREMENTS.md)。** 开发、测试与项目介绍先读当前需求，会话工作指引见 [AGENTS.md](AGENTS.md)。本文件只负责功能速览与运行说明。
 
 ## 功能概览
 
@@ -12,8 +14,9 @@
 - **社区交流**：路线话题、回复、处理状态、订阅更新与站内通知。
 - **个人主页**：作品、动态、关注关系，以及受隐私设置控制的收藏与学习列表。
 - **后台管理**：账号管理、官方路线维护、社区内容治理、举报处理、审计与系统信息。
+- **工坊助手**：基础验收已获用户确认，包含真实流式回答、路线检索及 Markdown 与可点击路线链接；已实现只读站内搜索、公开详情工具、ReAct 与内存 checkpointer。新增结构化意图识别、主图分流、检索子图和可取消方向标签，待真实分类效果验收。复杂场景和更多样式后续处理，路线创作及外部搜索尚未接入。
 
-当前代码仍保留整体就绪开关 `COMMUNITY_APPLICATION_READY = False`。上述模块已有实现，但不代表整个项目已完成最终验收。具体进度见上级目录的 `task_progress.md`，历史阶段说明不作为当前运行依据。
+当前整体就绪开关为 `COMMUNITY_APPLICATION_READY = False`。模块代码存在不代表整个项目已完成最终验收；完整工作区的当前状态见上级目录 [task_progress.md](../task_progress.md)。
 
 ## 技术栈
 
@@ -40,6 +43,7 @@
 | `backend/app/schemas/` | 请求与响应模型 |
 | `backend/app/core/` | 安全、异常、日志、中间件及限流 |
 | `backend/app/config/` | 环境配置与枚举 |
+| `backend/app/agent/` | 助手模型、提示词、内存会话与对话服务 |
 | `backend/migrations/` | Alembic 数据库迁移 |
 | `backend/scripts/` | 本地密钥配置和管理员创建工具 |
 | `backend/tests/` | 后端测试 |
@@ -88,6 +92,9 @@ uv run python -m scripts.configure_auth
 | `CORS_ORIGINS` | 允许的前端来源，JSON 数组 |
 | `AVATAR_STORAGE_DIR` | 默认 `backend/.data/avatars` |
 | `OUTBOX_ENABLED` | 是否启动通知后台任务，默认 `true` |
+| `LLM_API_KEY` / `LLM_MODEL` | 助手模型凭证与模型名，使用基础对话时配置 |
+| `LLM_BASE_URL` | 可选的 OpenAI 兼容接口地址 |
+| `LLM_TIMEOUT_SECONDS` / `LLM_TOTAL_TIMEOUT_SECONDS` | 模型请求超时 / 整轮生成超时 |
 
 ### 3. 创建数据库并迁移
 
@@ -205,13 +212,34 @@ $env:PLAYWRIGHT_CHANNEL = 'chromium'
 
 ## 使用与部署说明
 
-- 登录凭证保存在前端内存，刷新页面需要重新登录。修改密码、停用账号或管理员重置会撤销相关会话。
+- 登录凭证及原到期时间保存在当前标签页的 sessionStorage，刷新后先调用 `/api/v1/users/me` 验证并恢复身份，再判断路由权限；刷新不延长有效期，不提供自动续期。过期、退出或 401 清除记录，暂时网络失败保留凭证并提供重新尝试。用户资料不保存到浏览器存储；修改密码、停用账号或管理员重置仍由后端撤销相关会话。
 - 修改工作稿不改变已发布快照；学习者是否升级到新版由本人确认，不自动覆盖旧版进度。
 - 收藏、关注、开始学习及更新订阅是独立操作。
 - 打卡按北京时间计算，同日多路线打卡在累计天数中合并为一天；节点完成不自动产生打卡。
+- 学习者自由选择阶段与节点，完成标记可撤销；外链访问提示不表示学完，不自动改变完成状态。
+- 助手使用内存会话与 LangGraph InMemorySaver，后端重启或热重载清空记录，运行时使用单 worker，模型须支持工具调用。生成期间暂不提供停止、新建或切换会话。检索仅查询公开路线，不改变收藏、学习或工作稿；当前 DeepSeek 配置下，回答与检索模型开启思考，意图识别使用独立的非思考客户端（共用凭证和模型名），每轮额外调用一次进行 function_calling 结构化分类，避免强制工具选择与思考模式冲突；检索分支最多 5 次带工具模型调用，再用一次无工具调用收尾。同一工具每轮累计失败最多 3 次。
 - 头像文件位于 `backend/.data/avatars`，部署时需持久化并与数据库一起备份。
 - `pnpm build` 生成 `frontend/dist/`。生产部署需配置静态服务、SPA 路由回退及 `/api`、`/health` 反向代理；Vite 开发代理不会包含在构建产物中。
 - `pnpm preview` 只用于预览静态构建，不代表完整生产部署；访问 API 仍需正确的地址或代理配置。
+
+## 日志配置
+
+后端使用 structlog，入口为 `backend/app/core/logging.py`：`configure_logging(level)`
+由 `main.py` 的应用工厂调用，其他模块通过 `get_logger(__name__)` 获取日志器。
+日志级别由 `.env` 的 `LOG_LEVEL` 控制，默认 `INFO`；支持大小写及首尾空格，无效值回退到 `INFO`。
+
+```python
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+logger.info("operation_completed", target_id=target_id)
+```
+
+应用日志输出到控制台，包含时间、级别、模块名及事件字段；终端启用颜色，重定向时输出纯文本。
+请求内的应用日志自动携带 `request_id`，请求结束时恢复上下文；响应头中的 `X-Request-ID` 可用于关联排查。
+请求耗时统计到响应头开始发送，SSE 不代表整轮生成耗时。异常调用点只记录异常类型等必要字段，
+不主动输出凭证、请求体、对话正文或供应商异常原文。SQLAlchemy、httpx、httpcore 默认只输出 WARNING 及以上日志。
+第三方标准 logging 日志沿用其消息内容，Uvicorn 保留自身日志配置。当前没有日志文件保存或轮转。
 
 ## Git 提交约定
 

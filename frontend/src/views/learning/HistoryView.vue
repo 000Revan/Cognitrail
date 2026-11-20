@@ -102,14 +102,14 @@ onBeforeUnmount(() => { generation++ })
         id="version-history"
         aria-label="学习版本历史"
       >
-        <h2>版本历史</h2><p>旧版本保留只读内容与进度，查看历史不会切换当前学习。</p>
+        <h2>版本历史</h2><p>回顾学过的路线版本。</p>
         <ul class="learning-version-list">
           <li
             v-for="item in versions.items"
             :key="item.sessionId"
           >
             <strong>V{{ item.versionNo }} · {{ item.title }}</strong>
-            <span> {{ item.isCurrentSession ? '当前学习' : '历史只读' }} · {{ item.completedNodeCount }} / {{ item.progressNodeCount }} · {{ item.progressPercent }}%</span>
+            <span> {{ item.isCurrentSession ? '当前学习' : '历史版本' }} · {{ item.completedNodeCount }} / {{ item.progressNodeCount }} · {{ item.progressPercent }}%</span>
             <RouterLink
               :to="{ name: 'learning-content', params: { id: item.id }, query: item.isCurrentSession ? {} : { session: item.sessionId } }"
               class="text-link"

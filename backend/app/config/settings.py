@@ -50,6 +50,21 @@ class Settings(BaseSettings):
     outbox_lease_seconds: int = Field(default=30, ge=5, le=300)
     outbox_max_attempts: int = Field(default=8, ge=1, le=100)
 
+    # 使用 SecretStr 保存密钥，避免对象打印时直接显示密钥。
+    llm_api_key: SecretStr = SecretStr("")
+
+    # 模型名称由环境变量提供；空值表示尚未配置。
+    llm_model: str = ""
+
+    # 模型服务的兼容接口地址；空值使用 SDK 默认地址。
+    llm_base_url: str = ""
+
+    # 单次网络操作的超时秒数，限制在 1～300 秒。
+    llm_timeout_seconds: float = Field(default=60, ge=1, le=300)
+
+    # 整轮模型生成的总时长限制，限制在 1～600 秒。
+    llm_total_timeout_seconds: float = Field(default=180, ge=1, le=600)
+
     @field_validator("app_timezone")
     @classmethod
     def valid_timezone(cls, value: str) -> str:
@@ -83,3 +98,6 @@ class Settings(BaseSettings):
             database=self.db_name,
             query={"charset": "utf8mb4"},
         )
+
+
+settings = Settings()
