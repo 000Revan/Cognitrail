@@ -9,6 +9,8 @@ dependencies = [
     "pydantic-settings>=2.7,<3",
     "sqlalchemy[asyncio]>=2.0.36,<2.1",
     "asyncmy>=0.2.10,<0.3",
+    # MySQL caching_sha2_password / sha256_password 的 RSA 认证依赖。
+    "cryptography",
     "alembic>=1.14,<2",
     "uvicorn>=0.34,<1",
     "tzdata>=2025.1",

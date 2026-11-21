@@ -1,249 +1,255 @@
 # 知途工坊 Cognitrail
 
-面向自学者的学习路线创作、分享与发现社区。路线以阶段、节点组织学习目标、建议顺序与外部参考链接；位置恢复、完成标记与自愿打卡是辅助能力。
+知途工坊是面向自学者的学习路线社区平台，以「路线 → 阶段 → 节点」组织学习目标、建议顺序与外部参考资源，提供路线创作、版本发布、社区发现与交流，并集成 AI 工坊助手进行流式问答和站内路线检索。
 
-**产品需求统一见 [REQUIREMENTS.md](REQUIREMENTS.md)。** 开发、测试与项目介绍先读当前需求，会话工作指引见 [AGENTS.md](AGENTS.md)。本文件只负责功能速览与运行说明。
+使用者可以发现适合自己的路线，自由选择节点学习并记录位置与进度；创作者可以持续维护路线，通过独立工作稿与发布快照管理更新。
 
-## 功能概览
+· [后端镜像](https://hub.docker.com/r/moonmirror/cognitrail-backend) · [前端镜像](https://hub.docker.com/r/moonmirror/cognitrail-frontend)
 
-- **账号与资料**：注册、登录、修改密码、头像上传、个人资料和隐私设置。
-- **路线创作**：编辑工作稿、阶段、节点及资源，发布冻结版本，归档与恢复路线。
-- **社区发现**：搜索、难度筛选、排序、分页、路线详情和独立收藏。
-- **个人学习**：恢复阅读位置、标记或撤销节点完成、每日打卡、打卡日历及连续天数。
-- **版本升级**：预览版本差异，由学习者确认升级并处理节点完成状态，保留旧版学习历史。
-- **社区交流**：路线话题、回复、处理状态、订阅更新与站内通知。
-- **个人主页**：作品、动态、关注关系，以及受隐私设置控制的收藏与学习列表。
-- **后台管理**：账号管理、官方路线维护、社区内容治理、举报处理、审计与系统信息。
-- **工坊助手**：基础验收已获用户确认，包含真实流式回答、路线检索及 Markdown 与可点击路线链接；已实现只读站内搜索、公开详情工具、ReAct、MySQL 会话历史与 SQLite checkpointer。新增结构化意图识别、主图分流、检索子图和可取消方向标签，分类模型关闭思考修复已由用户验证通过，持久化待迁移与页面验收。复杂场景和更多样式后续处理，路线创作及外部搜索尚未接入。
+## 功能介绍
 
-当前整体就绪开关为 `COMMUNITY_APPLICATION_READY = False`。模块代码存在不代表整个项目已完成最终验收；完整工作区的当前状态见上级目录 [task_progress.md](../task_progress.md)。
+| 模块       | 功能                                                                                    |
+| ---------- | --------------------------------------------------------------------------------------- |
+| 账号与资料 | 注册登录、刷新恢复登录状态、个人资料、头像上传、密码修改和隐私设置。                    |
+| 路线创作   | 可视化编辑阶段与节点、配置节点说明和外部资源、保存工作稿、发布及归档恢复。              |
+| 版本管理   | 工作稿与发布快照隔离；新版差异预览、主动升级、进度迁移与历史保留。                      |
+| 社区发现   | 关键词搜索、难度筛选、排序、分页浏览、路线详情与收藏。                                  |
+| 路线学习   | 自由选择阶段与节点、恢复阅读位置、手动完成与撤销、外链访问标记、每日打卡及日历。        |
+| 交流与通知 | 路线话题、评论回复、话题处理、路线更新与话题订阅、站内通知。                            |
+| 个人主页   | 路线作品、动态、关注与粉丝，以及按隐私设置展示的收藏和学习列表。                        |
+| 工坊助手   | SSE 流式对话、意图识别、只读站内路线检索、Markdown 与路线链接展示、历史会话与重启续聊。 |
+| 管理后台   | 账号管理、官方路线维护、内容举报与治理、操作审计及系统信息。                            |
+
+路线发布后，作者继续编辑工作稿，线上发布版本保持稳定；学习者可以查看新版差异后自行选择升级。收藏、开始学习、关注及订阅分别操作。节点完成标记、外链访问提示和每日打卡分别记录。
 
 ## 技术栈
 
-| 部分 | 技术 |
-| --- | --- |
-| 前端 | Vue 3、TypeScript、Vite、Element Plus、Pinia、Vue Router、Axios |
-| 后端 | Python 3.12、FastAPI、Pydantic 2、Uvicorn |
-| 数据存储 | MySQL、SQLAlchemy 2 异步 ORM、asyncmy、Alembic |
-| 认证 | JWT、Argon2 密码哈希、数据库会话管理 |
-| 测试与检查 | pytest、Ruff、Vitest、Playwright、ESLint、vue-tsc |
-| 依赖管理 | uv、pnpm，使用已提交的锁文件 |
+| 部分     | 技术                                                              |
+| -------- | ----------------------------------------------------------------- |
+| 前端     | Vue 3、TypeScript、Vite、Element Plus、Pinia、Vue Router、Axios   |
+| 后端     | Python 3.12、FastAPI、Pydantic 2、Uvicorn                         |
+| 数据库   | MySQL 8.0、SQLAlchemy 2 异步 ORM、asyncmy、Alembic                |
+| AI 助手  | LangChain、LangGraph、ChatOpenAI、ReAct、SSE、SQLite checkpointer |
+| 身份认证 | JWT、Argon2、持久登录会话                                         |
+| 日志     | structlog、request_id 请求关联                                    |
+| 部署     | Docker、Docker Compose、Nginx                                     |
+| 依赖管理 | uv、pnpm                                                          |
 
-站内通知通过应用内后台任务和数据库 outbox 处理，目前无需额外部署 Redis 或消息队列。
+后端采用 Router → Service → CRUD 分层，数据库结构通过 Alembic 管理。站内通知使用数据库 outbox 与应用内后台任务投递。助手历史消息存储于 MySQL，运行上下文通过 SQLite 检查点持久化。
 
-## 目录说明
+## Docker 快速启动
 
-| 路径 | 职责 |
-| --- | --- |
-| `backend/app/main.py` | FastAPI 应用入口 |
-| `backend/app/routers/` | HTTP 接口；业务前缀 `/api/v1` |
-| `backend/app/services/` | 业务处理 |
-| `backend/app/domain/` | 账号和路线业务规则 |
-| `backend/app/database/` | 数据连接、ORM 模型及数据访问 |
-| `backend/app/schemas/` | 请求与响应模型 |
-| `backend/app/core/` | 安全、异常、日志、中间件及限流 |
-| `backend/app/config/` | 环境配置与枚举 |
-| `backend/app/agent/` | 助手模型、提示词、Graph 与对话服务 |
-| `backend/migrations/` | Alembic 数据库迁移 |
-| `backend/scripts/` | 本地密钥配置和管理员创建工具 |
-| `backend/tests/` | 后端测试 |
-| `frontend/src/` | 页面、组件、路由、状态与接口调用 |
-| `frontend/tests/` | 前端单元及浏览器测试 |
+### 1. 获取项目
 
-## 本地运行
-
-以下命令以 **PowerShell** 为例，起始目录为本文件所在的 `Cognitrail`。若从外层项目目录开始，先执行 `Set-Location Cognitrail`。
-
-### 1. 准备环境
-
-- Python **3.12**（后端约束为 `>=3.12,<3.13`）。
-- uv。
-- Node.js **>=22.12.0**。
-- pnpm **12.11.2**（见 `frontend/package.json`）。
-- MySQL，当前默认基线为 **8.0.14**。
-
-**MySQL 版本采用精确匹配，不是最低版本判断。** 迁移及健康检查会比较服务器版本与 `DB_REQUIRED_VERSION`。使用其他 MySQL 版本前应验证迁移、触发器和数据库测试，再配置实际版本，不能直接视为兼容。项目使用触发器落实部分数据库约束。
-
-### 2. 配置后端
+安装 Git、Docker 和 Docker Compose；Windows 使用 Docker Desktop 的 Linux 容器引擎。下面的命令以 PowerShell 为例。
 
 ```powershell
-Set-Location backend
-uv sync --locked
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+git clone https://github.com/000Revan/Cognitrail.git
+cd Cognitrail
 ```
 
-编辑 `backend/.env` 中的本地数据库配置，再生成签名密钥：
+Compose 使用以下公开镜像：
+
+| 服务   | 镜像                                 |
+| ------ | ------------------------------------ |
+| 前端   | `moonmirror/cognitrail-frontend:1.0` |
+| 后端   | `moonmirror/cognitrail-backend:1.0`  |
+| 数据库 | `mysql:8.0`                          |
+
+### 2. 配置环境变量
+
+在项目根目录执行，仅在文件不存在时复制模板：
 
 ```powershell
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+if (-not (Test-Path backend/.env)) { Copy-Item backend/.env.example backend/.env }
+```
+
+编辑根目录 `.env`，设置新数据库的密码：
+
+```dotenv
+MYSQL_ROOT_PASSWORD='替换为你设置的root密码'
+DB_PASSWORD='替换为你设置的应用数据库密码'
+```
+
+编辑 `backend/.env`：
+
+| 配置项                      | 填写方式                                         |
+| --------------------------- | ------------------------------------------------ |
+| `JWT_SECRET`                | 自行生成至少 32 字节的随机签名密钥，并保持稳定。 |
+| `DB_REQUIRED_VERSION`       | 与 MySQL 服务端版本一致，按下一步查询结果填写。  |
+| `LLM_API_KEY`               | 使用工坊助手时填写模型服务密钥。                 |
+| `LLM_MODEL`                 | 填写支持工具调用和结构化输出的模型名称。         |
+| `LLM_BASE_URL`              | 按模型服务要求填写 OpenAI 兼容接口地址。         |
+| `LLM_TIMEOUT_SECONDS`       | 单次模型网络操作超时，默认 60 秒。               |
+| `LLM_TOTAL_TIMEOUT_SECONDS` | 整轮生成总超时，默认 180 秒。                    |
+
+当前模型客户端使用 DeepSeek 的 `thinking` 参数区分回答与意图识别，模型服务需支持对应参数。配置文件示例见 [后端环境变量模板](backend/.env.example)。
+
+拉取镜像后，可使用后端镜像生成随机 JWT 密钥，将输出复制到 `backend/.env` 的 `JWT_SECRET`：
+
+```powershell
+docker compose config --quiet
+docker compose pull
+docker run --rm --entrypoint python moonmirror/cognitrail-backend:1.0 -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+根目录 `.env` 为 Compose 提供数据库密码；`backend/.env` 通过 `env_file` 注入后端。Compose 将后端数据库地址覆盖为 `mysql:3306`，账号覆盖为 `cognitrail`，数据库名为 `cognitrail_community`，密码使用根目录的 `DB_PASSWORD`。容器运行所需真实配置保留在宿主机，通过环境变量注入，不打入镜像。
+
+### 3. 启动数据库
+
+```powershell
+docker compose up -d mysql
+docker compose ps
+```
+
+等待 MySQL 显示 `healthy` 后，查询版本，按提示输入根目录 `.env` 中的 root 密码：
+
+```powershell
+docker compose exec mysql mysql -u root -p -e "SELECT VERSION();"
+```
+
+将结果填写到 `backend/.env`，例如本项目已运行的 MySQL 版本为：
+
+```dotenv
+DB_REQUIRED_VERSION=8.0.46
+```
+
+版本校验采用精确匹配；如返回值包含连字符发行后缀，填写连字符前的版本号。`mysql:8.0` 是浮动标签，可以在确认使用版本后将 Compose 固定为具体版本或镜像摘要。
+
+MySQL 容器首次启动会创建 `cognitrail_community` 数据库及应用账号。初始化环境变量对空数据卷生效，已有数据库的密码通过 SQL 修改。
+
+### 4. 初始化数据表并启动
+
+```powershell
+docker compose run --rm backend alembic upgrade head
+docker compose run --rm backend alembic current
+```
+
+确认迁移成功，当前版本为 `c006_agent_history` 后启动全部服务：
+
+```powershell
+docker compose up -d
+docker compose ps
+```
+
+打开 [http://localhost:8080](http://localhost:8080)，注册普通用户即可开始使用。
+
+需要管理员账号时执行，密码通过交互输入：
+
+```powershell
+docker compose exec backend python -m scripts.create_admin --username local_admin --nickname 管理员
+```
+
+管理员使用独立后台管理内容；普通社区操作使用普通用户账号。
+
+### 5. 常用管理命令
+
+```powershell
+# 查看应用日志
+docker compose logs --tail 100 backend frontend
+
+# 实时查看后端日志
+docker compose logs -f backend
+
+# 应用外部配置变更
+docker compose up -d
+
+# 停止服务，保留命名数据卷
+docker compose down
+```
+
+| 内容                   | 保存位置                                     |
+| ---------------------- | -------------------------------------------- |
+| 业务数据及助手历史消息 | `mysql_data` 命名卷，容器内 `/var/lib/mysql` |
+| 头像与助手检查点       | `backend_data` 命名卷，容器内 `/app/.data`   |
+
+数据卷名称默认带有 `cognitrail_` 前缀。备份和迁移时配套保存 MySQL 数据及 SQLite 检查点；首次创建的新数据卷从空数据库开始。`docker compose down -v` 会删除命名数据卷，日常停止服务使用不带 `-v` 的命令。
+
+前端通过 Nginx 同源转发 `/api/` 和 `/health` 至后端，数据库通过容器网络访问。仅修改 Compose 或外部 `.env` 后执行 `docker compose up -d` 即可应用配置；`restart` 不会重新注入环境变量。
+
+## 本地开发运行
+
+### 环境要求
+
+- Python 3.12、uv。
+- Node.js >=22.12.0、pnpm 12.11.2。
+- MySQL 8.0，`DB_REQUIRED_VERSION` 与实际服务端版本一致。
+
+### 后端
+
+从项目根目录进入后端并安装依赖：
+
+```powershell
+cd backend
+uv sync --locked
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 uv run python -m scripts.configure_auth
 ```
 
-该脚本保留已有数据库配置，不输出密钥，也不会覆盖已有有效密钥。常用配置如下，完整选项见 [.env.example](backend/.env.example)。
+编辑 `backend/.env` 的 `DB_HOST`、`DB_PORT`、`DB_NAME`、`DB_USER`、`DB_PASSWORD` 和 `DB_REQUIRED_VERSION`，连接你的本地数据库；助手配置与 Docker 部署使用相同变量。
 
-| 配置项 | 用途 / 默认值 |
-| --- | --- |
-| `DB_HOST` / `DB_PORT` | 数据库地址 / `3306` |
-| `DB_NAME` | 开发库，默认 `cognitrail_community` |
-| `DB_USER` / `DB_PASSWORD` | 本地数据库凭证 |
-| `DB_REQUIRED_VERSION` | 精确匹配的数据库版本，默认 `8.0.14` |
-| `TEST_DB_NAME` | 独立测试库，需显式配置 |
-| `JWT_SECRET` | 随机签名密钥，至少 32 字节 |
-| `APP_TIMEZONE` | 业务时区，默认 `Asia/Shanghai` |
-| `CORS_ORIGINS` | 允许的前端来源，JSON 数组 |
-| `AVATAR_STORAGE_DIR` | 默认 `backend/.data/avatars` |
-| `OUTBOX_ENABLED` | 是否启动通知后台任务，默认 `true` |
-| `LLM_API_KEY` / `LLM_MODEL` | 助手模型凭证与模型名，使用基础对话时配置 |
-| `LLM_BASE_URL` | 可选的 OpenAI 兼容接口地址 |
-| `LLM_TIMEOUT_SECONDS` / `LLM_TOTAL_TIMEOUT_SECONDS` | 模型请求超时 / 整轮生成超时 |
-| `AGENT_CHECKPOINT_PATH` | 默认 `backend/.data/agent/checkpoints.sqlite`，必须与 MySQL 会话数据配套持久化备份 |
-
-### 3. 创建数据库并迁移
-
-先在 MySQL 客户端执行以下 SQL。应用和 Alembic **不负责创建数据库**。
+在 MySQL 中创建数据库：
 
 ```sql
 CREATE DATABASE IF NOT EXISTS cognitrail_community
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE IF NOT EXISTS cognitrail_community_test
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-数据库账号需有相应建表、迁移及创建触发器的权限。在 `backend` 目录执行：
+数据库账号需具备建表和创建触发器的权限。MySQL 开启二进制日志并使用普通迁移账号时，由数据库管理员配置 `log_bin_trust_function_creators=1`；项目 Compose 已包含该启动参数。
+
+在 `backend` 目录执行：
 
 ```powershell
 uv run alembic upgrade head
-uv run alembic current
-```
-
-当前迁移链为 `c001_community` → `c002_notification_delete` → `c003_official_roadmaps` → `c004_topic_privacy` → `c005_resource_visits` → `c006_agent_history`。迁移会拒绝不兼容的旧库或不完整结构；新安装使用独立空库，不要通过 `stamp` 跳过结构校验。
-
-### 4. 启动后端并创建管理员
-
-仍在 `backend` 目录：
-
-```powershell
-uv run python -m scripts.create_admin --username local_admin --nickname 管理员
 uv run python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload --no-proxy-headers
 ```
 
-管理员创建为首次使用时的可选步骤，密码通过交互输入，同名账号不会被覆盖。普通用户从前端注册；管理员参与普通社区操作时应使用另外的普通账号。
+接口文档：[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)。
 
-### 5. 启动前端
+### 前端
 
-另开终端，进入 `Cognitrail/frontend`：
+另开终端，在项目根目录执行：
 
 ```powershell
+cd frontend
 pnpm install --frozen-lockfile
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 pnpm dev
 ```
 
-默认通过 Vite 将 `/api` 和 `/health` 代理至 `http://127.0.0.1:8000`。调整后端端口时，同时修改前端 `.env` 的 `VITE_API_PROXY_TARGET`。
+访问 [http://127.0.0.1:5173](http://127.0.0.1:5173)。开发服务器默认将 `/api` 和 `/health` 代理到 `http://127.0.0.1:8000`；后端地址改变时调整 `VITE_API_PROXY_TARGET`。
 
-| 地址 | 用途 |
-| --- | --- |
-| http://127.0.0.1:5173 | 前端 |
-| http://127.0.0.1:8000/docs | Swagger 接口文档 |
-| http://127.0.0.1:8000/health/live | 进程存活检查，不访问数据库 |
-| http://127.0.0.1:8000/health/ready | 数据库、迁移和整体业务就绪检查 |
+## 从源码构建镜像
 
-当前整体就绪开关为关闭状态，即使数据库正常，`/health/ready` 仍会返回 `503 COMMUNITY_REFACTOR_PENDING`；应结合错误码区分数据库故障与整体尚未就绪。
-
-## 测试与代码检查
-
-测试源码和独立测试配置仅保留在本地，不随 GitHub 仓库分发；以下测试命令需要本地仍有对应文件。代码检查和项目构建配置继续保留。
-
-以下命令依据项目配置整理；本次 README 整理未重新执行应用启动或完整测试，不沿用历史通过数量作为当前验证结果。
-
-### 后端
-
-在 `backend` 目录执行离线单元测试和静态检查：
+在项目根目录执行，分别使用两端目录作为构建上下文：
 
 ```powershell
-uv run pytest tests/unit -m "not database"
-uv run ruff check .
-uv run ruff format --check .
+docker build -t moonmirror/cognitrail-backend:1.0 ./backend
+docker build -t moonmirror/cognitrail-frontend:1.0 ./frontend
 ```
 
-真实数据库测试需使用独立测试库。先在单独终端中迁移测试库，避免影响日常启动环境：
+前后端 `.dockerignore` 筛选构建文件，排除真实环境变量文件、运行数据、测试及本机依赖缓存。前端采用多阶段构建，最终运行镜像包含 Nginx 配置与静态打包结果。后端使用锁文件安装生产依赖，并以单 worker 运行。
 
-```powershell
-# 当前目录：backend；仅在这个终端临时切换迁移目标。
-$env:DB_NAME = 'cognitrail_community_test'
-uv run alembic upgrade head
-Remove-Item Env:DB_NAME
+## 代码结构
 
-# 测试通过 TEST_DB_NAME 选择测试库，DB_NAME 仍应为开发库。
-$env:TEST_DB_NAME = 'cognitrail_community_test'
-$env:RUN_DB_TESTS = '1'
-uv run pytest
-Remove-Item Env:RUN_DB_TESTS
-Remove-Item Env:TEST_DB_NAME
-```
+| 路径                                       | 职责                                    |
+| ------------------------------------------ | --------------------------------------- |
+| `frontend/src/`                            | 页面、组件、路由、状态管理与接口请求    |
+| `frontend/nginx.conf`                      | 静态服务、SPA 路由回退与反向代理        |
+| `backend/app/main.py`                      | FastAPI 应用入口                        |
+| `backend/app/routers/`                     | HTTP 与 SSE 接口                        |
+| `backend/app/services/`                    | 业务流程、权限和事务编排                |
+| `backend/app/database/`                    | ORM 模型、数据库连接与 CRUD             |
+| `backend/app/schemas/`                     | 请求与响应结构                          |
+| `backend/app/agent/`                       | 模型连接、提示词、Graph、工具及对话服务 |
+| `backend/app/config/`、`backend/app/core/` | 环境配置、认证、日志与基础设施          |
+| `backend/migrations/`                      | 数据库版本迁移                          |
+| `backend/scripts/`                         | JWT 密钥配置和管理员创建                |
+| `docker-compose.yaml`                      | 前端、后端、MySQL 服务编排及持久化配置  |
 
-测试会写入并清理数据，不使用开发库或生产库。允许的测试库名称为 `cognitrail_community_test`，或追加下划线分隔的字母数字后缀。部分历史用例仍被隔离或跳过，应查看实际测试输出。
+## 后续更新方向
 
-### 前端
-
-在 `frontend` 目录：
-
-```powershell
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-```
-
-浏览器测试要求测试库已迁移且后端 `.env` 中数据库连接与 JWT 配置可用：
-
-```powershell
-$env:TEST_DB_NAME = 'cognitrail_community_test'
-pnpm test:e2e
-Remove-Item Env:TEST_DB_NAME
-```
-
-Playwright 自动启动独立后端 `18000` 和前端 `15173`，不会复用已运行的开发服务。Windows 默认使用已安装的 Microsoft Edge。如需使用 Playwright Chromium，可在执行测试前运行：
-
-```powershell
-pnpm exec playwright install chromium
-$env:PLAYWRIGHT_CHANNEL = 'chromium'
-```
-
-端口可通过 `E2E_BACKEND_PORT`、`E2E_FRONTEND_PORT` 调整。报告与截图位于 `frontend/test-results/` 等测试产物目录，不提交到仓库。
-
-## 使用与部署说明
-
-- 登录凭证及原到期时间保存在当前标签页的 sessionStorage，刷新后先调用 `/api/v1/users/me` 验证并恢复身份，再判断路由权限；刷新不延长有效期，不提供自动续期。过期、退出或 401 清除记录，暂时网络失败保留凭证并提供重新尝试。用户资料不保存到浏览器存储；修改密码、停用账号或管理员重置仍由后端撤销相关会话。
-- 修改工作稿不改变已发布快照；学习者是否升级到新版由本人确认，不自动覆盖旧版进度。
-- 收藏、关注、开始学习及更新订阅是独立操作。
-- 打卡按北京时间计算，同日多路线打卡在累计天数中合并为一天；节点完成不自动产生打卡。
-- 学习者自由选择阶段与节点，完成标记可撤销；外链访问提示不表示学完，不自动改变完成状态。
-- 助手会话与最终问答由 MySQL 保存，Graph 状态由 SQLite AsyncSqliteSaver 保存；先迁移到 c006_agent_history，重启或热重载保留相同检查点文件即可续聊。旧内存记录不自动迁移。运行时仍使用单 worker，模型须支持工具调用。生成期间暂不提供停止、新建或切换会话。检索仅查询公开路线，不改变收藏、学习或工作稿；当前 DeepSeek 配置下，回答与检索模型开启思考，意图识别使用独立的非思考客户端（共用凭证和模型名），每轮额外调用一次进行 function_calling 结构化分类，避免强制工具选择与思考模式冲突；检索分支最多 5 次带工具模型调用，再用一次无工具调用收尾。同一工具每轮累计失败最多 3 次。
-- 头像文件位于 `backend/.data/avatars`，部署时需持久化并与数据库一起备份。
-- `pnpm build` 生成 `frontend/dist/`。生产部署需配置静态服务、SPA 路由回退及 `/api`、`/health` 反向代理；Vite 开发代理不会包含在构建产物中。
-- `pnpm preview` 只用于预览静态构建，不代表完整生产部署；访问 API 仍需正确的地址或代理配置。
-
-## 日志配置
-
-后端使用 structlog，入口为 `backend/app/core/logging.py`：`configure_logging(level)`
-由 `main.py` 的应用工厂调用，其他模块通过 `get_logger(__name__)` 获取日志器。
-日志级别由 `.env` 的 `LOG_LEVEL` 控制，默认 `INFO`；支持大小写及首尾空格，无效值回退到 `INFO`。
-
-```python
-from app.core.logging import get_logger
-
-logger = get_logger(__name__)
-logger.info("operation_completed", target_id=target_id)
-```
-
-应用日志输出到控制台，包含时间、级别、模块名及事件字段；终端启用颜色，重定向时输出纯文本。
-请求内的应用日志自动携带 `request_id`，请求结束时恢复上下文；响应头中的 `X-Request-ID` 可用于关联排查。
-请求耗时统计到响应头开始发送，SSE 不代表整轮生成耗时。异常调用点只记录异常类型等必要字段，
-不主动输出凭证、请求体、对话正文或供应商异常原文。SQLAlchemy、httpx、httpcore 默认只输出 WARNING 及以上日志。
-第三方标准 logging 日志沿用其消息内容，Uvicorn 保留自身日志配置。当前没有日志文件保存或轮转。
-
-## Git 提交约定
-
-GitHub 仓库仅保留项目本体：前后端业务源码、静态资源、README、运行配置模板、依赖清单与锁文件、维护脚本及 Alembic 迁移文件。`.gitignore` 排除测试源码、独立测试配置、测试报告、真实 `.env`、虚拟环境、`node_modules`、构建产物、缓存、日志、上传数据、压缩包和过程资料；这些文件可以继续保留在本地。
-
-忽略规则不会自动取消 Git 已跟踪的文件；提交前检查 `git status`。当前说明不包含可直接登录的预置密码。
+- AI 辅助设计路线结构草稿，支持多轮修改与预览确认。
+- 围绕路线节点搜索候选外部资源，展示来源和匹配说明，供创作者审核选用。
+- 持续完善路线发现与创作交互体验。

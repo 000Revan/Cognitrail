@@ -1,0 +1,54 @@
+name: cognitrail
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请填写root密码}
+      MYSQL_DATABASE: cognitrail_community
+      MYSQL_USER: cognitrail
+      MYSQL_PASSWORD: ${DB_PASSWORD:?请填写应用数据库密码}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --log-bin-trust-function-creators=1
+
+  backend:
+    image: moonmirror/cognitrail-backend:1.0
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: cognitrail_community
+      DB_USER: cognitrail
+      DB_PASSWORD: ${DB_PASSWORD:?请填写应用数据库密码}
+      AVATAR_STORAGE_DIR: /app/.data/avatars
+      AGENT_CHECKPOINT_PATH: /app/.data/agent/checkpoints.sqlite
+    volumes:
+      - backend_data:/app/.data
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: moonmirror/cognitrail-frontend:1.0
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  backend_data:
