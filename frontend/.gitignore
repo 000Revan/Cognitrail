@@ -1,0 +1,115 @@
+# 前端独立使用时也生效；保留 src/、public/ 和 index.html。
+# 保留 Dockerfile、.dockerignore、Vite / TypeScript / ESLint 配置、
+# package.json、pnpm-lock.yaml、pnpm-workspace.yaml 与环境配置模板。
+
+# 本地环境配置与凭证；前端配置模板保留。
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.sample
+*.local
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+
+# 下载的依赖、包管理器缓存与构建产物。
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/install-state.gz
+.bun/
+.vite/
+.cache/
+.cache-loader/
+.eslintcache
+.stylelintcache
+.ruff_cache/
+*.tsbuildinfo
+/dist/
+/build/
+
+# 测试源码、独立测试配置及测试产物仅留本地。
+tests/
+test/
+__tests__/
+__mocks__/
+*.test.*
+*.spec.*
+playwright.config.*
+vitest.config.*
+jest.config.*
+test-results/
+playwright-report/
+blob-report/
+allure-results/
+allure-report/
+playwright/.cache/
+coverage/
+.nyc_output/
+*.lcov
+coverage.xml
+junit.xml
+junit-*.xml
+
+# 运行时数据与日志；不排除 public/ 中的项目图片和其他静态资源。
+.data/
+/uploads/
+logs/
+*.log
+*.pid
+*.pid.lock
+
+# 开发过程资料、实验与备份。
+/docs/
+/reports/
+/artifacts/
+/screenshots/
+/backups/
+/exports/
+/git/
+notebooks/
+.ipynb_checkpoints/
+*.ipynb
+/task_progress.md
+/agent_development_plan.md
+/REQUIREMENTS.md
+/项目架构设计.md
+tmp/
+temp/
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+*.bak
+*.backup
+*.old
+*.orig
+*.rej
+*.tmp
+*.temp
+~$*
+
+# 本地助手、IDE 和操作系统文件。
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.agents/
+.codex/
+.claude/
+.cursor/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+
+# .gitignore 不会取消已跟踪文件；提交前检查 git ls-files -ci --exclude-standard。

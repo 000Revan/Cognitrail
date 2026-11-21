@@ -16,20 +16,30 @@ router = APIRouter(prefix="/agent", tags=["智能助手"])
 @router.post("/chat", response_class=EventSourceResponse)
 async def chat(data: ChatRequest, current: CurrentUser, request: Request):
     """接收问题及可选会话 ID，将服务事件转换成 SSE。"""
-    async for event in ChatService.response(data, current, request.app.state.database.sessions):
+    async for event in ChatService.response(
+        data, current, request.app.state.database.sessions, request.app.state.agent_checkpointer
+    ):
         yield ServerSentEvent(data=event["data"], event=event["event"])
 
 
 @router.get("/conversations", response_model=ApiResponse[list[ConversationSummary]])
-async def list_conversations(current: CurrentUser):
+async def list_conversations(current: CurrentUser, request: Request):
     """读取左侧会话列表。"""
-    return ApiResponse(data=ChatService.list_conversations(current.user.id))
+    return ApiResponse(
+        data=await ChatService.list_conversations(
+            current.user.id, request.app.state.database.sessions
+        )
+    )
 
 
 @router.get(
     "/conversations/{conversation_id}/messages",
     response_model=ApiResponse[ConversationDetail],
 )
-async def get_conversation_messages(conversation_id: UUID, current: CurrentUser):
+async def get_conversation_messages(conversation_id: UUID, current: CurrentUser, request: Request):
     """读取选中会话的历史消息。"""
-    return ApiResponse(data=ChatService.get_messages(str(conversation_id), current.user.id))
+    return ApiResponse(
+        data=await ChatService.get_messages(
+            str(conversation_id), current.user.id, request.app.state.database.sessions
+        )
+    )

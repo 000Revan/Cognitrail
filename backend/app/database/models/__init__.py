@@ -1,6 +1,7 @@
-"""集中注册31张社区业务表；导入只建立映射，不连接或创建数据库。"""
+"""集中注册社区业务表与助手会话表；导入只建立映射，不连接或创建数据库。"""
 
 from app.database.models.activity import ActivityEvent
+from app.database.models.agent import AgentConversation, AgentMessage
 from app.database.models.enrollment import LearningSession, LearningSessionEvent, UserRoadmap
 from app.database.models.favorite import RoadmapFavorite, RoadmapSubscription
 from app.database.models.issue import IssueComment, IssueEvent, IssueSubscription, RoadmapIssue
@@ -26,6 +27,8 @@ from app.database.models.user import User, UserAuthSession, UserFollow, UserPriv
 # StudyRecord仅保留旧服务的导入失败边界，不属于业务ORM导出。
 __all__ = [
     "ActivityEvent",
+    "AgentConversation",
+    "AgentMessage",
     "AuditLog",
     "ContentReport",
     "IssueComment",

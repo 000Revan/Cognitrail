@@ -14,7 +14,7 @@
 - **社区交流**：路线话题、回复、处理状态、订阅更新与站内通知。
 - **个人主页**：作品、动态、关注关系，以及受隐私设置控制的收藏与学习列表。
 - **后台管理**：账号管理、官方路线维护、社区内容治理、举报处理、审计与系统信息。
-- **工坊助手**：基础验收已获用户确认，包含真实流式回答、路线检索及 Markdown 与可点击路线链接；已实现只读站内搜索、公开详情工具、ReAct 与内存 checkpointer。新增结构化意图识别、主图分流、检索子图和可取消方向标签，待真实分类效果验收。复杂场景和更多样式后续处理，路线创作及外部搜索尚未接入。
+- **工坊助手**：基础验收已获用户确认，包含真实流式回答、路线检索及 Markdown 与可点击路线链接；已实现只读站内搜索、公开详情工具、ReAct、MySQL 会话历史与 SQLite checkpointer。新增结构化意图识别、主图分流、检索子图和可取消方向标签，分类模型关闭思考修复已由用户验证通过，持久化待迁移与页面验收。复杂场景和更多样式后续处理，路线创作及外部搜索尚未接入。
 
 当前整体就绪开关为 `COMMUNITY_APPLICATION_READY = False`。模块代码存在不代表整个项目已完成最终验收；完整工作区的当前状态见上级目录 [task_progress.md](../task_progress.md)。
 
@@ -43,7 +43,7 @@
 | `backend/app/schemas/` | 请求与响应模型 |
 | `backend/app/core/` | 安全、异常、日志、中间件及限流 |
 | `backend/app/config/` | 环境配置与枚举 |
-| `backend/app/agent/` | 助手模型、提示词、内存会话与对话服务 |
+| `backend/app/agent/` | 助手模型、提示词、Graph 与对话服务 |
 | `backend/migrations/` | Alembic 数据库迁移 |
 | `backend/scripts/` | 本地密钥配置和管理员创建工具 |
 | `backend/tests/` | 后端测试 |
@@ -95,6 +95,7 @@ uv run python -m scripts.configure_auth
 | `LLM_API_KEY` / `LLM_MODEL` | 助手模型凭证与模型名，使用基础对话时配置 |
 | `LLM_BASE_URL` | 可选的 OpenAI 兼容接口地址 |
 | `LLM_TIMEOUT_SECONDS` / `LLM_TOTAL_TIMEOUT_SECONDS` | 模型请求超时 / 整轮生成超时 |
+| `AGENT_CHECKPOINT_PATH` | 默认 `backend/.data/agent/checkpoints.sqlite`，必须与 MySQL 会话数据配套持久化备份 |
 
 ### 3. 创建数据库并迁移
 
@@ -114,7 +115,7 @@ uv run alembic upgrade head
 uv run alembic current
 ```
 
-当前迁移链为 `c001_community` → `c002_notification_delete` → `c003_official_roadmaps` → `c004_topic_privacy` → `c005_resource_visits`。迁移会拒绝不兼容的旧库或不完整结构；新安装使用独立空库，不要通过 `stamp` 跳过结构校验。
+当前迁移链为 `c001_community` → `c002_notification_delete` → `c003_official_roadmaps` → `c004_topic_privacy` → `c005_resource_visits` → `c006_agent_history`。迁移会拒绝不兼容的旧库或不完整结构；新安装使用独立空库，不要通过 `stamp` 跳过结构校验。
 
 ### 4. 启动后端并创建管理员
 
@@ -217,7 +218,7 @@ $env:PLAYWRIGHT_CHANNEL = 'chromium'
 - 收藏、关注、开始学习及更新订阅是独立操作。
 - 打卡按北京时间计算，同日多路线打卡在累计天数中合并为一天；节点完成不自动产生打卡。
 - 学习者自由选择阶段与节点，完成标记可撤销；外链访问提示不表示学完，不自动改变完成状态。
-- 助手使用内存会话与 LangGraph InMemorySaver，后端重启或热重载清空记录，运行时使用单 worker，模型须支持工具调用。生成期间暂不提供停止、新建或切换会话。检索仅查询公开路线，不改变收藏、学习或工作稿；当前 DeepSeek 配置下，回答与检索模型开启思考，意图识别使用独立的非思考客户端（共用凭证和模型名），每轮额外调用一次进行 function_calling 结构化分类，避免强制工具选择与思考模式冲突；检索分支最多 5 次带工具模型调用，再用一次无工具调用收尾。同一工具每轮累计失败最多 3 次。
+- 助手会话与最终问答由 MySQL 保存，Graph 状态由 SQLite AsyncSqliteSaver 保存；先迁移到 c006_agent_history，重启或热重载保留相同检查点文件即可续聊。旧内存记录不自动迁移。运行时仍使用单 worker，模型须支持工具调用。生成期间暂不提供停止、新建或切换会话。检索仅查询公开路线，不改变收藏、学习或工作稿；当前 DeepSeek 配置下，回答与检索模型开启思考，意图识别使用独立的非思考客户端（共用凭证和模型名），每轮额外调用一次进行 function_calling 结构化分类，避免强制工具选择与思考模式冲突；检索分支最多 5 次带工具模型调用，再用一次无工具调用收尾。同一工具每轮累计失败最多 3 次。
 - 头像文件位于 `backend/.data/avatars`，部署时需持久化并与数据库一起备份。
 - `pnpm build` 生成 `frontend/dist/`。生产部署需配置静态服务、SPA 路由回退及 `/api`、`/health` 反向代理；Vite 开发代理不会包含在构建产物中。
 - `pnpm preview` 只用于预览静态构建，不代表完整生产部署；访问 API 仍需正确的地址或代理配置。

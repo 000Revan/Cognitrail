@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     # 整轮模型生成的总时长限制，限制在 1～600 秒。
     llm_total_timeout_seconds: float = Field(default=180, ge=1, le=600)
 
+    # 文件必须与 MySQL 会话数据配套保留，重启后继续使用相同路径。
+    agent_checkpoint_path: Path = BACKEND_ROOT / ".data/agent/checkpoints.sqlite"
+
     @field_validator("app_timezone")
     @classmethod
     def valid_timezone(cls, value: str) -> str:

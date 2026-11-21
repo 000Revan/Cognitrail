@@ -1,10 +1,11 @@
-"""应用启动不隐式建表或执行迁移。"""
+"""启动 MySQL 连接池和 SQLite 检查点；不执行 MySQL 建表或迁移。"""
 
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from app.database.session import Database
 from app.services.notification_service import OutboxDispatcher
@@ -21,7 +22,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         else None
     )
     try:
-        yield
+        checkpoint_path = app.state.settings.agent_checkpoint_path
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        async with AsyncSqliteSaver.from_conn_string(str(checkpoint_path)) as checkpointer:
+            await checkpointer.setup()
+            app.state.agent_checkpointer = checkpointer
+            yield
     finally:
         if worker:
             worker.cancel()

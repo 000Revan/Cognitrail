@@ -11,7 +11,7 @@ from app.database import models  # noqa: F401
 from app.database.base import Base
 from app.database.session import Database
 
-# 冻结迁移只负责首次建库及旧库预检；结构比较以当前31表业务ORM为准。
+# 冻结迁移只负责首次建库及旧库预检；结构比较以当前业务ORM为准。
 baseline = ScriptDirectory.from_config(context.config).get_revision("c001_community").module
 target_metadata = Base.metadata
 
@@ -47,9 +47,15 @@ def migrate(connection) -> None:
         ["c003_official_roadmaps"],
         ["c004_topic_privacy"],
         ["c005_resource_visits"],
+        ["c006_agent_history"],
     ):
         # 复用冻结基线的完整表集合校验，增量版本另外核对新增列。
-        if revisions == ["c005_resource_visits"]:
+        if revisions == ["c006_agent_history"]:
+            agent_tables = {"agent_conversations", "agent_messages"}
+            if not agent_tables.issubset(tables):
+                raise RuntimeError("缺少助手历史表")
+            tables = tables - agent_tables
+        if revisions in (["c005_resource_visits"], ["c006_agent_history"]):
             if "resource_visits" not in tables:
                 raise RuntimeError("缺少资源访问记录表")
             tables = tables - {"resource_visits"}
@@ -61,11 +67,12 @@ def migrate(connection) -> None:
             ["c003_official_roadmaps"],
             ["c004_topic_privacy"],
             ["c005_resource_visits"],
+            ["c006_agent_history"],
         ):
             route_columns = {c["name"] for c in inspect(connection).get_columns("skill_roadmaps")}
             if "roadmap_type" not in route_columns:
                 raise RuntimeError("官方路线迁移版本与实际列不一致，未执行迁移")
-        if revisions in (["c004_topic_privacy"], ["c005_resource_visits"]):
+        if revisions in (["c004_topic_privacy"], ["c005_resource_visits"], ["c006_agent_history"]):
             privacy_columns = {
                 c["name"] for c in inspect(connection).get_columns("user_privacy_settings")
             }
